@@ -46,4 +46,6 @@ main = do
 
         , TestLabel "Uninitialised Global Variable Analysation" syntaxAnalyserTest1
         , TestLabel "Initialised Global Variable Analysation"   syntaxAnalyserTest2
+        , TestLabel "No Argument Function Analysation"          syntaxAnalyserTest3
+        , TestLabel "Function with Arguments Analysation"       syntaxAnalyserTest4
         ]

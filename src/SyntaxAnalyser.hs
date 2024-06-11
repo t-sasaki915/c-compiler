@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module SyntaxAnalyser
   ( SyntaxAnalyserError(..)
   , Syntax(..)
@@ -12,7 +10,6 @@ import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 import TokeniserDomain (typeKeywords)
 
-import Control.Lens hiding (index)
 import Data.List (intercalate)
 
 data SyntaxAnalyserError = UnexpectedToken String Int Token String
@@ -48,38 +45,41 @@ instance Show SyntaxTree where
     show (SyntaxTree root subs) =
         show root ++ " [" ++ intercalate ", " (map show subs) ++ "]"
 
+type IToken = (Int, Token)
+type Expr = Expression
+
 data AnalyserStep = ExpectVarOrFunType
-                  | ExpectVarOrFunLabel (Int, Token)
-                  | ExpectEqualOrOpenParenthesesOrSemicolon (Int, Token) (Int, Token)
-                  | ExpectGlobalVariableDefaultValue (Int, Token) (Int, Token)
-                  | ExpectGlobalVariableSemicolon (Int, Token) (Int, Token) Expression
-
-data State = State
-    { _functions :: [SyntaxTree]
-    , _globalVariables :: [SyntaxTree]
-    }
-
-makeLenses ''State
+                  | ExpectVarOrFunLabel IToken
+                  | ExpectEqualOrOpenParenthesesOrSemicolon IToken IToken
+                  | ExpectGlobalVariableDefaultValue IToken IToken
+                  | ExpectGlobalVariableSemicolon IToken IToken Expr
+                  | ExpectFunArgTypeOrEnd IToken IToken
+                  | ExpectFunArgEnd IToken IToken
+                  | ExpectFunArgType IToken IToken [Syntax]
+                  | ExpectFunArgLabel IToken IToken IToken [Syntax]
+                  | ExpectFunArgCommaOrEnd IToken IToken IToken IToken [Syntax]
+                  | ExpectFunOpenBrace IToken IToken [Syntax]
+                  | ExpectFunCloseBrace IToken IToken [Syntax]
 
 syntaxAnalyse :: String -> [(Int, Token)] -> Either SyntaxAnalyserError SyntaxTree
-syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
+syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
     where
-    analyse :: AnalyserStep -> State -> Int -> Either SyntaxAnalyserError SyntaxTree
-    analyse step state index | index >= length tokens =
+    analyse :: AnalyserStep -> [SyntaxTree] -> Int -> Either SyntaxAnalyserError SyntaxTree
+    analyse step defs index | index >= length tokens =
         case step of
             ExpectVarOrFunType ->
-                Right $ SyntaxTree Program (_functions state ++ _globalVariables state)
+                Right $ SyntaxTree Program defs
 
             _ ->
                 Left $ UnexpectedEOF source (fst $ last tokens)
 
-    analyse step state index =
+    analyse step defs index =
         case step of
             ExpectVarOrFunType ->
                 case token of
                     (_, Keyword k) | k `elem` typeKeywords ->
                         let newStep = ExpectVarOrFunLabel token in
-                        analyse newStep state (index + 1)
+                        analyse newStep defs (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -90,7 +90,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
                         let
                             newStep =
                                 ExpectEqualOrOpenParenthesesOrSemicolon t token in
-                        analyse newStep state (index + 1)
+                        analyse newStep defs (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -100,15 +100,16 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
                     (_, Semicolon) ->
                         let newStep = ExpectVarOrFunType
                             newVar = SyntaxTree (VarDefinition t l Nothing) []
-                            newState = over globalVariables (++ [newVar]) state in
-                        analyse newStep newState (index + 1)
+                            newDefs = defs ++ [newVar] in
+                        analyse newStep newDefs (index + 1)
 
-                    (_, Symbol '(') ->
-                        contextualUnexpectedTokenHalt -- TODO
+                    (_, OpenParentheses) ->
+                        let newStep = ExpectFunArgTypeOrEnd t l in
+                        analyse newStep defs (index + 1)
 
                     (_, Symbol '=') ->
                         let newStep = ExpectGlobalVariableDefaultValue t l in
-                        analyse newStep state (index + 1)
+                        analyse newStep defs (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -117,7 +118,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
                         let newStep = ExpectGlobalVariableSemicolon t l expr in
-                        analyse newStep state newIndex
+                        analyse newStep defs newIndex
                     Left err ->
                         Left $ InvalidExpression err
 
@@ -126,9 +127,90 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
                     (_, Semicolon) ->
                         let newStep = ExpectVarOrFunType
                             newVar = SyntaxTree (VarDefinition t l (Just d)) []
-                            newState = over globalVariables (++ [newVar]) state in
-                        analyse newStep newState (index + 1)
+                            newDefs = defs ++ [newVar] in
+                        analyse newStep newDefs (index + 1)
 
+                    _ ->
+                        contextualUnexpectedTokenHalt
+            
+            (ExpectFunArgTypeOrEnd t l) ->
+                case token of
+                    (_, Keyword "void") ->
+                        let newStep = ExpectFunArgEnd t l in
+                        analyse newStep defs (index + 1)
+
+                    (_, Keyword k) | k `elem` typeKeywords ->
+                        let newStep = ExpectFunArgLabel t l token [] in
+                        analyse newStep defs (index + 1)
+
+                    (_, CloseParentheses) ->
+                        let newStep = ExpectFunOpenBrace t l [] in
+                        analyse newStep defs (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectFunArgEnd t l) ->
+                case token of
+                    (_, CloseParentheses) ->
+                        let newStep = ExpectFunOpenBrace t l [] in
+                        analyse newStep defs (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectFunArgType t l determined) ->
+                case token of
+                    (_, Keyword k) | k `elem` typeKeywords ->
+                        let newStep = ExpectFunArgLabel t l token determined in
+                        analyse newStep defs (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+            
+            (ExpectFunArgLabel t l at determined) ->
+                case token of
+                    (_, Identifier _) ->
+                        let newStep = ExpectFunArgCommaOrEnd t l at token determined in
+                        analyse newStep defs (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectFunArgCommaOrEnd t l at al determined) ->
+                case token of
+                    (_, Comma) ->
+                        let newArg = VarDefinition at al Nothing
+                            args = determined ++ [newArg]
+                            newStep = ExpectFunArgType t l args in
+                        analyse newStep defs (index + 1)
+
+                    (_, CloseParentheses) ->
+                        let newArg = VarDefinition at al Nothing
+                            args = determined ++ [newArg]
+                            newStep = ExpectFunOpenBrace t l args in
+                        analyse newStep defs (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectFunOpenBrace t l args) ->
+                case token of
+                    (_, OpenBrace) ->
+                        let newStep = ExpectFunCloseBrace t l args in
+                        analyse newStep defs (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectFunCloseBrace t l args) ->
+                case token of
+                    (_, CloseBrace) ->
+                        let newFunc = SyntaxTree (FunDefinition t l args []) []
+                            newDefs = defs ++ [newFunc]
+                            newStep = ExpectVarOrFunType in
+                        analyse newStep newDefs (index + 1)
+                    
                     _ ->
                         contextualUnexpectedTokenHalt
         where
@@ -142,11 +224,26 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
                 case step of
                     ExpectVarOrFunType ->
                         "Type"
-                    (ExpectVarOrFunLabel _) ->
+                    (ExpectVarOrFunLabel {}) ->
                         "Identifier"
-                    (ExpectEqualOrOpenParenthesesOrSemicolon _ _) ->
+                    (ExpectEqualOrOpenParenthesesOrSemicolon {}) ->
                         "'=', '(' or ';'"
-                    (ExpectGlobalVariableDefaultValue _ _) ->
+                    (ExpectGlobalVariableDefaultValue {}) ->
                         "Expression"
                     (ExpectGlobalVariableSemicolon {}) ->
                         "';'"
+                    (ExpectFunArgTypeOrEnd {}) ->
+                        "Type or ')'"
+                    (ExpectFunArgEnd {}) ->
+                        "')'"
+                    (ExpectFunArgType {}) ->
+                        "Type"
+                    (ExpectFunArgLabel {}) ->
+                        "Identifier"
+                    (ExpectFunArgCommaOrEnd {}) ->
+                        "',' or ')'"
+                    (ExpectFunOpenBrace {}) ->
+                        "'{'"
+                    (ExpectFunCloseBrace {}) ->
+                        "'}'"
+ 
