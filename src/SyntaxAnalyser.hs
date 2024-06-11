@@ -5,19 +5,19 @@ module SyntaxAnalyser
   , syntaxAnalyse
   ) where
 
-import ExpressionAnalyser (Expression(..))
+import ExpressionAnalyser (Expression(..), ExpressionAnalyserError)
 import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 
 data SyntaxAnalyserError = UnexpectedToken String Int Token String
-                         | UnexpectedEOF String Int
+                         | InvalidExpression ExpressionAnalyserError
                          deriving Eq
 
 instance Show SyntaxAnalyserError where
     show (UnexpectedToken src ind t e) =
         "(" ++ sourceLoc src ind ++ ") Expected " ++ e ++ " but " ++ show t ++ " found."
-    show (UnexpectedEOF src ind) =
-        "(" ++ sourceLoc src ind ++ ") Unexpected end of file."
+    show (InvalidExpression e) =
+        show e
 
 data Syntax = Program
             -- FunctionDef Type Identifier [ArgumentVariableDef] [Content]

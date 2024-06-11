@@ -4,6 +4,7 @@ module ExpressionAnalyser
     , expressionAnalyse
     ) where
 
+import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 
 data ExpressionAnalyserError = UnexpectedToken String Int Token String
@@ -11,10 +12,10 @@ data ExpressionAnalyserError = UnexpectedToken String Int Token String
                              deriving Eq
 
 instance Show ExpressionAnalyserError where
-    show (UnexpectedToken _ _ t e) =
-        "Expected " ++ e ++ " but " ++ show t ++ " found."
-    show (UnexpectedEOF _ _) =
-        "Unexpected end of file."
+    show (UnexpectedToken src ind t e) =
+        "(" ++ sourceLoc src ind ++ ") Expected " ++ e ++ " but " ++ show t ++ " found."
+    show (UnexpectedEOF src ind) =
+        "(" ++ sourceLoc src ind ++ ") Unexpected end of file."
 
 data Expression = VarReference (Int, Token)
                 | NumReference (Int, Token)
