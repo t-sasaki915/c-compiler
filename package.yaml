@@ -1,14 +1,13 @@
 name:                c-compiler
-version:             0.1.0.0
-github:              "githubuser/c-compiler"
-license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2024 Author name here"
+version:             1.0.0.0
+github:              "t-sasaki915/c-compiler"
+license:             MIT
+author:              "Sasaki Touma"
+maintainer:          "netst915@gmail.com"
+copyright:           "2024 Sasaki Touma"
 
 extra-source-files:
 - README.md
-- CHANGELOG.md
 
 # Metadata used when publishing your package
 # synopsis:            Short description of your package

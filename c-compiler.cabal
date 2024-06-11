@@ -1,27 +1,26 @@
-cabal-version: 2.2
+cabal-version: 1.12
 
 -- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
 name:           c-compiler
-version:        0.1.0.0
+version:        1.0.0.0
 description:    Please see the README on GitHub at <https://github.com/githubuser/c-compiler#readme>
-homepage:       https://github.com/githubuser/c-compiler#readme
-bug-reports:    https://github.com/githubuser/c-compiler/issues
-author:         Author name here
-maintainer:     example@example.com
-copyright:      2024 Author name here
-license:        BSD-3-Clause
+homepage:       https://github.com/t-sasaki915/c-compiler#readme
+bug-reports:    https://github.com/t-sasaki915/c-compiler/issues
+author:         Sasaki Touma
+maintainer:     netst915@gmail.com
+copyright:      2024 Sasaki Touma
+license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
-    CHANGELOG.md
 
 source-repository head
   type: git
-  location: https://github.com/githubuser/c-compiler
+  location: https://github.com/t-sasaki915/c-compiler
 
 library
   exposed-modules:
@@ -37,8 +36,6 @@ library
       TokeniserDomain
   other-modules:
       Paths_c_compiler
-  autogen-modules:
-      Paths_c_compiler
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -51,8 +48,6 @@ library
 executable c-compiler-exe
   main-is: Main.hs
   other-modules:
-      Paths_c_compiler
-  autogen-modules:
       Paths_c_compiler
   hs-source-dirs:
       app
@@ -72,8 +67,6 @@ test-suite c-compiler-test
       ExpressionAnalyserSpecDomain
       TokeniserSpec
       TokeniserSpecDomain
-      Paths_c_compiler
-  autogen-modules:
       Paths_c_compiler
   hs-source-dirs:
       test
