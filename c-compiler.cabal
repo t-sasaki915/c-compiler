@@ -65,6 +65,8 @@ test-suite c-compiler-test
   other-modules:
       ExpressionAnalyserSpec
       ExpressionAnalyserSpecDomain
+      SyntaxAnalyserSpec
+      SyntaxAnalyserSpecDomain
       TokeniserSpec
       TokeniserSpecDomain
       Paths_c_compiler

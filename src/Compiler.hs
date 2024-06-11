@@ -16,8 +16,7 @@ compile sourceFileName = do
     case cSourceOrErr of
         Right cSource -> do
             case tokenise cSource of
-                Right tokens -> do
-                    mapM_ print tokens
+                Right tokens ->
                     case syntaxAnalyse cSource tokens of
                         Right tree -> do
                             print tree

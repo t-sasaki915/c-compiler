@@ -2,6 +2,7 @@ import System.Exit (exitFailure, exitSuccess)
 import Test.HUnit
 
 import ExpressionAnalyserSpec
+import SyntaxAnalyserSpec
 import TokeniserSpec
 
 main :: IO ()
@@ -42,4 +43,6 @@ main = do
         , TestLabel "Expression Opposition Analysation"         expressionAnalyserTest18
         , TestLabel "Function Opposition Analysation"           expressionAnalyserTest19
         , TestLabel "Complex Opposition Analysation"            expressionAnalyserTest20
+
+        , TestLabel "Global Variable Analysation"               syntaxAnalyserTest1
         ]
