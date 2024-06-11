@@ -33,17 +33,17 @@ data Expression = VarReference (Int, Token)
                 | Opposition Expression
                 deriving (Show, Eq)
 
-data AnalyserStep = WaitingForOpenParenthesesOrIdentifierOrNumber
-                  | WaitingForExpressionToReverse
-                  | WaitingForCalcSymbolOrEnd Expression
-                  | WaitingForExpressionToDoBasicCalculation
+data AnalyserStep = ExpectOpenParenthesesOrIdentifierOrNumber
+                  | ExpectExpressionToReverse
+                  | ExpectCalcSymbolOrEnd Expression
+                  | ExpectExpressionToDoBasicCalculation
                         (Expression -> Expression -> Expression)
                         Expression
 
 expressionAnalyse :: String -> [(Int, Token)] -> Int ->
                      Either ExpressionAnalyserError (Int, Expression)
 expressionAnalyse source tokens =
-    analyse WaitingForOpenParenthesesOrIdentifierOrNumber
+    analyse ExpectOpenParenthesesOrIdentifierOrNumber
     where
     analyse :: AnalyserStep -> Int -> Either ExpressionAnalyserError (Int, Expression)
     analyse _ index | index >= length tokens =
@@ -51,12 +51,12 @@ expressionAnalyse source tokens =
 
     analyse step index =
         case step of
-            WaitingForOpenParenthesesOrIdentifierOrNumber ->
+            ExpectOpenParenthesesOrIdentifierOrNumber ->
                 case token of
                     (_, OpenParentheses) ->
                         case expressionAnalyse source tokens (index + 1) of
                             Right (newIndex, expr) ->
-                                let newStep = WaitingForCalcSymbolOrEnd expr in
+                                let newStep = ExpectCalcSymbolOrEnd expr in
                                 analyse newStep (newIndex + 1)
                             Left err ->
                                 Left err
@@ -64,30 +64,30 @@ expressionAnalyse source tokens =
                     (_, Identifier _) ->
                         case functionCallAnalyse source tokens index of
                             Right (newIndex, expr) ->
-                                let newStep = WaitingForCalcSymbolOrEnd expr in
+                                let newStep = ExpectCalcSymbolOrEnd expr in
                                 analyse newStep (newIndex + 1)
                             Left err ->
                                 Left err
 
                     (_, Number _) ->
                         let expr = NumReference token
-                            newStep = WaitingForCalcSymbolOrEnd expr in
+                            newStep = ExpectCalcSymbolOrEnd expr in
                         analyse newStep (index + 1)
 
                     (_, Symbol '!') ->
-                        let newStep = WaitingForExpressionToReverse in
+                        let newStep = ExpectExpressionToReverse in
                         analyse newStep (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            WaitingForExpressionToReverse ->
+            ExpectExpressionToReverse ->
                 case token of
                     (_, OpenParentheses) ->
                         case expressionAnalyse source tokens (index + 1) of
                             Right (newIndex, expr) ->
                                 let newExpr = Opposition expr
-                                    newStep = WaitingForCalcSymbolOrEnd newExpr in
+                                    newStep = ExpectCalcSymbolOrEnd newExpr in
                                 analyse newStep (newIndex + 1)
                             Left err ->
                                 Left err
@@ -96,20 +96,20 @@ expressionAnalyse source tokens =
                         case functionCallAnalyse source tokens index of
                             Right (newIndex, expr) ->
                                 let newExpr = Opposition expr
-                                    newStep = WaitingForCalcSymbolOrEnd newExpr in
+                                    newStep = ExpectCalcSymbolOrEnd newExpr in
                                 analyse newStep (newIndex + 1)
                             Left err ->
                                 Left err
 
                     (_, Number _) ->
                         let expr = Opposition $ NumReference token
-                            newStep = WaitingForCalcSymbolOrEnd expr in
+                            newStep = ExpectCalcSymbolOrEnd expr in
                         analyse newStep (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (WaitingForCalcSymbolOrEnd e) ->
+            (ExpectCalcSymbolOrEnd e) ->
                 case token of
                     (_, Semicolon) ->
                         Right (index, e)
@@ -153,7 +153,7 @@ expressionAnalyse source tokens =
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (WaitingForExpressionToDoBasicCalculation calc e) ->
+            (ExpectExpressionToDoBasicCalculation calc e) ->
                 basicCalculation calc e
         where
         token = tokens !! index
@@ -162,7 +162,7 @@ expressionAnalyse source tokens =
                                     Expression ->
                                     Either ExpressionAnalyserError (Int, Expression)
         scheduleBasicCalculation f e =
-            let newStep = WaitingForExpressionToDoBasicCalculation f e in
+            let newStep = ExpectExpressionToDoBasicCalculation f e in
             analyse newStep (index + 1)
 
         basicCalculation :: (Expression -> Expression -> Expression) ->
@@ -173,7 +173,7 @@ expressionAnalyse source tokens =
                     case expressionAnalyse source tokens (index + 1) of
                         Right (newIndex, expr) ->
                             let newExpr = f e expr
-                                newStep = WaitingForCalcSymbolOrEnd newExpr in
+                                newStep = ExpectCalcSymbolOrEnd newExpr in
                             analyse newStep (newIndex + 1)
                         Left err ->
                             Left err
@@ -182,14 +182,14 @@ expressionAnalyse source tokens =
                     case functionCallAnalyse source tokens index of
                         Right (newIndex, expr) ->
                             let newExpr = f e expr
-                                newStep = WaitingForCalcSymbolOrEnd newExpr in
+                                newStep = ExpectCalcSymbolOrEnd newExpr in
                             analyse newStep (newIndex + 1)
                         Left err ->
                             Left err
 
                 (_, Number _) ->
                     let expr = f e (NumReference token)
-                        newStep = WaitingForCalcSymbolOrEnd expr in
+                        newStep = ExpectCalcSymbolOrEnd expr in
                     analyse newStep (index + 1)
 
                 _ ->
@@ -201,25 +201,25 @@ expressionAnalyse source tokens =
             where
             expectation =
                 case step of
-                    WaitingForOpenParenthesesOrIdentifierOrNumber ->
+                    ExpectOpenParenthesesOrIdentifierOrNumber ->
                         "'(', Identifier or Number"
-                    WaitingForExpressionToReverse ->
+                    ExpectExpressionToReverse ->
                         "Expression"
-                    (WaitingForCalcSymbolOrEnd _) ->
+                    (ExpectCalcSymbolOrEnd _) ->
                         "Calculation Symbol, ')', ',' or ';'"
-                    (WaitingForExpressionToDoBasicCalculation _ _) ->
+                    (ExpectExpressionToDoBasicCalculation _ _) ->
                         "Expression"
 
 
-data FAnalyserStep = WaitingForIdentifier
-                   | WaitingForOpenParentheses (Int, Token)
-                   | WaitingForArgOrCloseParentheses (Int, Token) [Expression]
-                   | WaitingForArgument (Int, Token) [Expression]
-                   | WaitingForCommaOrCloseParentheses (Int, Token) [Expression]
+data FAnalyserStep = ExpectIdentifier
+                   | ExpectOpenParentheses (Int, Token)
+                   | ExpectArgOrCloseParentheses (Int, Token) [Expression]
+                   | ExpectArgument (Int, Token) [Expression]
+                   | ExpectCommaOrCloseParentheses (Int, Token) [Expression]
 
 functionCallAnalyse :: String -> [(Int, Token)] -> Int ->
                        Either ExpressionAnalyserError (Int, Expression)
-functionCallAnalyse source tokens = analyse WaitingForIdentifier
+functionCallAnalyse source tokens = analyse ExpectIdentifier
     where
     analyse :: FAnalyserStep -> Int -> Either ExpressionAnalyserError (Int, Expression)
     analyse _ index | index >= length tokens =
@@ -227,25 +227,25 @@ functionCallAnalyse source tokens = analyse WaitingForIdentifier
 
     analyse step index =
         case step of
-            WaitingForIdentifier ->
+            ExpectIdentifier ->
                 case token of
                     (_, Identifier _) ->
-                        let newStep = WaitingForOpenParentheses token in
+                        let newStep = ExpectOpenParentheses token in
                         analyse newStep (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (WaitingForOpenParentheses t) ->
+            (ExpectOpenParentheses t) ->
                 case token of
                     (_, OpenParentheses) ->
-                        let newStep = WaitingForArgOrCloseParentheses t [] in
+                        let newStep = ExpectArgOrCloseParentheses t [] in
                         analyse newStep (index + 1)
 
                     _ ->
                         Right (index - 1, VarReference t)
 
-            (WaitingForArgOrCloseParentheses t determined) ->
+            (ExpectArgOrCloseParentheses t determined) ->
                 case token of
                     (_, CloseParentheses) ->
                         Right (index, FunctionCall t determined)
@@ -254,24 +254,24 @@ functionCallAnalyse source tokens = analyse WaitingForIdentifier
                         case expressionAnalyse source tokens index of
                             Right (newIndex, expr) ->
                                 let args = determined ++ [expr]
-                                    newStep = WaitingForCommaOrCloseParentheses t args in
+                                    newStep = ExpectCommaOrCloseParentheses t args in
                                 analyse newStep newIndex
                             Left err ->
                                 Left err
 
-            (WaitingForArgument t determined) ->
+            (ExpectArgument t determined) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
                         let args = determined ++ [expr]
-                            newStep = WaitingForCommaOrCloseParentheses t args in
+                            newStep = ExpectCommaOrCloseParentheses t args in
                         analyse newStep newIndex
                     Left err ->
                         Left err
 
-            (WaitingForCommaOrCloseParentheses t determined) ->
+            (ExpectCommaOrCloseParentheses t determined) ->
                 case token of
                     (_, Comma) ->
-                        let newStep = WaitingForArgument t determined in
+                        let newStep = ExpectArgument t determined in
                         analyse newStep (index + 1)
 
                     (_, CloseParentheses) ->
@@ -289,13 +289,13 @@ functionCallAnalyse source tokens = analyse WaitingForIdentifier
             where
             expectation =
                 case step of
-                    WaitingForIdentifier ->
+                    ExpectIdentifier ->
                         "Identifier"
-                    (WaitingForOpenParentheses _) ->
+                    (ExpectOpenParentheses _) ->
                         "'('"
-                    (WaitingForArgOrCloseParentheses _ _) ->
+                    (ExpectArgOrCloseParentheses _ _) ->
                         "Expression or ')'"
-                    (WaitingForArgument _ _) ->
+                    (ExpectArgument _ _) ->
                         "Expression"
-                    (WaitingForCommaOrCloseParentheses _ _) ->
+                    (ExpectCommaOrCloseParentheses _ _) ->
                         "',' or ')'"

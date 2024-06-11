@@ -48,11 +48,11 @@ instance Show SyntaxTree where
     show (SyntaxTree root subs) =
         show root ++ " [" ++ intercalate ", " (map show subs) ++ "]"
 
-data AnalyserStep = WaitingForVarOrFunType
-                  | WaitingForVarOrFunLabel (Int, Token)
-                  | WaitingForEqualOrOpenParenthesesOrSemicolon (Int, Token) (Int, Token)
-                  | WaitingForGlobalVariableDefaultValue (Int, Token) (Int, Token)
-                  | WaitingForGlobalVariableSemicolon (Int, Token) (Int, Token) Expression
+data AnalyserStep = ExpectVarOrFunType
+                  | ExpectVarOrFunLabel (Int, Token)
+                  | ExpectEqualOrOpenParenthesesOrSemicolon (Int, Token) (Int, Token)
+                  | ExpectGlobalVariableDefaultValue (Int, Token) (Int, Token)
+                  | ExpectGlobalVariableSemicolon (Int, Token) (Int, Token) Expression
 
 data State = State
     { _functions :: [SyntaxTree]
@@ -62,12 +62,12 @@ data State = State
 makeLenses ''State
 
 syntaxAnalyse :: String -> [(Int, Token)] -> Either SyntaxAnalyserError SyntaxTree
-syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
+syntaxAnalyse source tokens = analyse ExpectVarOrFunType (State [] []) 0
     where
     analyse :: AnalyserStep -> State -> Int -> Either SyntaxAnalyserError SyntaxTree
     analyse step state index | index >= length tokens =
         case step of
-            WaitingForVarOrFunType ->
+            ExpectVarOrFunType ->
                 Right $ SyntaxTree Program (_functions state ++ _globalVariables state)
 
             _ ->
@@ -75,30 +75,30 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
 
     analyse step state index =
         case step of
-            WaitingForVarOrFunType ->
+            ExpectVarOrFunType ->
                 case token of
                     (_, Keyword k) | k `elem` typeKeywords ->
-                        let newStep = WaitingForVarOrFunLabel token in
+                        let newStep = ExpectVarOrFunLabel token in
                         analyse newStep state (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (WaitingForVarOrFunLabel t)->
+            (ExpectVarOrFunLabel t)->
                 case token of
                     (_, Identifier _) ->
                         let
                             newStep =
-                                WaitingForEqualOrOpenParenthesesOrSemicolon t token in
+                                ExpectEqualOrOpenParenthesesOrSemicolon t token in
                         analyse newStep state (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (WaitingForEqualOrOpenParenthesesOrSemicolon t l) ->
+            (ExpectEqualOrOpenParenthesesOrSemicolon t l) ->
                 case token of
                     (_, Semicolon) ->
-                        let newStep = WaitingForVarOrFunType
+                        let newStep = ExpectVarOrFunType
                             newVar = SyntaxTree (VarDefinition t l Nothing) []
                             newState = over globalVariables (++ [newVar]) state in
                         analyse newStep newState (index + 1)
@@ -107,24 +107,24 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
                         contextualUnexpectedTokenHalt -- TODO
 
                     (_, Symbol '=') ->
-                        let newStep = WaitingForGlobalVariableDefaultValue t l in
+                        let newStep = ExpectGlobalVariableDefaultValue t l in
                         analyse newStep state (index + 1)
 
                     _ ->
                         contextualUnexpectedTokenHalt
             
-            (WaitingForGlobalVariableDefaultValue t l) ->
+            (ExpectGlobalVariableDefaultValue t l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = WaitingForGlobalVariableSemicolon t l expr in
+                        let newStep = ExpectGlobalVariableSemicolon t l expr in
                         analyse newStep state newIndex
                     Left err ->
                         Left $ InvalidExpression err
 
-            (WaitingForGlobalVariableSemicolon t l d) ->
+            (ExpectGlobalVariableSemicolon t l d) ->
                 case token of
                     (_, Semicolon) ->
-                        let newStep = WaitingForVarOrFunType
+                        let newStep = ExpectVarOrFunType
                             newVar = SyntaxTree (VarDefinition t l (Just d)) []
                             newState = over globalVariables (++ [newVar]) state in
                         analyse newStep newState (index + 1)
@@ -140,13 +140,13 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
             where
             expectation =
                 case step of
-                    WaitingForVarOrFunType ->
+                    ExpectVarOrFunType ->
                         "Type"
-                    (WaitingForVarOrFunLabel _) ->
+                    (ExpectVarOrFunLabel _) ->
                         "Identifier"
-                    (WaitingForEqualOrOpenParenthesesOrSemicolon _ _) ->
+                    (ExpectEqualOrOpenParenthesesOrSemicolon _ _) ->
                         "'=', '(' or ';'"
-                    (WaitingForGlobalVariableDefaultValue _ _) ->
+                    (ExpectGlobalVariableDefaultValue _ _) ->
                         "Expression"
-                    (WaitingForGlobalVariableSemicolon {}) ->
+                    (ExpectGlobalVariableSemicolon {}) ->
                         "';'"
