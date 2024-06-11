@@ -1,5 +1,6 @@
 module SyntaxAnalyserSpec
     ( syntaxAnalyserTest1
+    , syntaxAnalyserTest2
     ) where
 
 import SyntaxAnalyser
@@ -19,3 +20,6 @@ syntaxAnalyserTest src expect =
 
 syntaxAnalyserTest1 :: Test
 syntaxAnalyserTest1 = syntaxAnalyserTest source1 expect1
+
+syntaxAnalyserTest2 :: Test
+syntaxAnalyserTest2 = syntaxAnalyserTest source2 expect2

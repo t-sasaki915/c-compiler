@@ -44,5 +44,6 @@ main = do
         , TestLabel "Function Opposition Analysation"           expressionAnalyserTest19
         , TestLabel "Complex Opposition Analysation"            expressionAnalyserTest20
 
-        , TestLabel "Global Variable Analysation"               syntaxAnalyserTest1
+        , TestLabel "Uninitialised Global Variable Analysation" syntaxAnalyserTest1
+        , TestLabel "Initialised Global Variable Analysation"   syntaxAnalyserTest2
         ]

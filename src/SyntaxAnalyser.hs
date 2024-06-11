@@ -7,7 +7,7 @@ module SyntaxAnalyser
   , syntaxAnalyse
   ) where
 
-import ExpressionAnalyser (Expression(..), ExpressionAnalyserError)
+import ExpressionAnalyser (Expression(..), ExpressionAnalyserError, expressionAnalyse)
 import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 import TokeniserDomain (typeKeywords)
@@ -51,6 +51,8 @@ instance Show SyntaxTree where
 data AnalyserStep = WaitingForVarOrFunType
                   | WaitingForVarOrFunLabel (Int, Token)
                   | WaitingForEqualOrOpenParenthesesOrSemicolon (Int, Token) (Int, Token)
+                  | WaitingForGlobalVariableDefaultValue (Int, Token) (Int, Token)
+                  | WaitingForGlobalVariableSemicolon (Int, Token) (Int, Token) Expression
 
 data State = State
     { _functions :: [SyntaxTree]
@@ -67,7 +69,7 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
         case step of
             WaitingForVarOrFunType ->
                 Right $ SyntaxTree Program (_functions state ++ _globalVariables state)
-        
+
             _ ->
                 Left $ UnexpectedEOF source (fst $ last tokens)
 
@@ -81,32 +83,52 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
 
                     _ ->
                         contextualUnexpectedTokenHalt
-            
+
             (WaitingForVarOrFunLabel t)->
                 case token of
                     (_, Identifier _) ->
-                        let 
+                        let
                             newStep =
                                 WaitingForEqualOrOpenParenthesesOrSemicolon t token in
                         analyse newStep state (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
-            
+
             (WaitingForEqualOrOpenParenthesesOrSemicolon t l) ->
                 case token of
                     (_, Semicolon) ->
                         let newStep = WaitingForVarOrFunType
-                            newVariable = SyntaxTree (VarDefinition t l Nothing) []
-                            newState = over globalVariables (++ [newVariable]) state in
+                            newVar = SyntaxTree (VarDefinition t l Nothing) []
+                            newState = over globalVariables (++ [newVar]) state in
                         analyse newStep newState (index + 1)
 
                     (_, Symbol '(') ->
                         contextualUnexpectedTokenHalt -- TODO
-                    
+
                     (_, Symbol '=') ->
-                        contextualUnexpectedTokenHalt -- TODO
-                    
+                        let newStep = WaitingForGlobalVariableDefaultValue t l in
+                        analyse newStep state (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+            
+            (WaitingForGlobalVariableDefaultValue t l) ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = WaitingForGlobalVariableSemicolon t l expr in
+                        analyse newStep state newIndex
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (WaitingForGlobalVariableSemicolon t l d) ->
+                case token of
+                    (_, Semicolon) ->
+                        let newStep = WaitingForVarOrFunType
+                            newVar = SyntaxTree (VarDefinition t l (Just d)) []
+                            newState = over globalVariables (++ [newVar]) state in
+                        analyse newStep newState (index + 1)
+
                     _ ->
                         contextualUnexpectedTokenHalt
         where
@@ -124,3 +146,7 @@ syntaxAnalyse source tokens = analyse WaitingForVarOrFunType (State [] []) 0
                         "Identifier"
                     (WaitingForEqualOrOpenParenthesesOrSemicolon _ _) ->
                         "'=', '(' or ';'"
+                    (WaitingForGlobalVariableDefaultValue _ _) ->
+                        "Expression"
+                    (WaitingForGlobalVariableSemicolon {}) ->
+                        "';'"
