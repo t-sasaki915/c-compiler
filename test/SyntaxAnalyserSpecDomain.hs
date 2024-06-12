@@ -20,6 +20,8 @@ module SyntaxAnalyserSpecDomain
     , expect9
     , source10
     , expect10
+    , source11
+    , expect11
     ) where
 
 import SyntaxAnalyser
@@ -311,6 +313,40 @@ expect10 = Right $
                         (VarReference (28, Identifier "b"))
                     )
                     [ FunctionCallSyntax (47, Identifier "bbb") []
+                    ]
+                ]
+            ) []
+        ]
+
+source11 :: String
+source11 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    while (a)"
+    , "        bbb();"
+    , "    while (b)"
+    , "        while (c)"
+    , "        {"
+    , "            ccc();"
+    , "        }"
+    , "}"
+    ]
+
+expect11 :: Result
+expect11 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ While (VarReference (24, Identifier "a"))
+                    [ FunctionCallSyntax (37, Identifier "bbb") []
+                    ]
+                , While (VarReference (53, Identifier "b"))
+                    [ While (VarReference (71, Identifier "c"))
+                        [ FunctionCallSyntax (98, Identifier "ccc") []
+                        ]
                     ]
                 ]
             ) []

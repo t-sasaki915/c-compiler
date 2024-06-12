@@ -197,7 +197,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunOpenBrace t l args) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, contents) ->
                                 let newStep = ExpectFunCloseBrace t l args contents in
                                 analyse newStep defs newIndex
@@ -265,12 +265,12 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectWhileOpenParentheses
                   | ExpectWhileCondition
                   | ExpectWhileCloseParentheses Expression
-                  | ExpectWhileOpenBrace Expression
+                  | ExpectWhileOpenBraceOrSyntax Expression
                   | ExpectWhileCloseBrace Expression [Syntax]
 
-functionAnalyse :: String -> [(Int, Token)] -> Int ->
+functionAnalyse :: String -> [(Int, Token)] -> Bool -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
-functionAnalyse source tokens = analyse ExpectFirstFactor []
+functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
     where
     analyse :: FAnalyseStep -> [Syntax] -> Int ->
                Either SyntaxAnalyserError (Int, [Syntax])
@@ -279,6 +279,9 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
 
     analyse step contents index =
         case step of
+            ExpectFirstFactor | justOneSyntax && not (null contents) ->
+                Right (index - 1, contents)
+
             ExpectFirstFactor ->
                 case token of
                     (_, Keyword "return") ->
@@ -426,7 +429,7 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     (_, OpenParentheses) ->
                         let newStep = ExpectWhileCondition in
                         analyse newStep contents (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
@@ -441,23 +444,30 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
             (ExpectWhileCloseParentheses cond) ->
                 case token of
                     (_, CloseParentheses) ->
-                        let newStep = ExpectWhileOpenBrace cond in
+                        let newStep = ExpectWhileOpenBraceOrSyntax cond in
                         analyse newStep contents (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (ExpectWhileOpenBrace cond) ->
+            (ExpectWhileOpenBraceOrSyntax cond) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, inner) ->
                                 let newStep = ExpectWhileCloseBrace cond inner in
                                 analyse newStep contents newIndex
                             Left err ->
                                 Left err
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        case functionAnalyse source tokens True index of
+                            Right (newIndex, inner) ->
+                                let newWhile = While cond inner
+                                    newContents = contents ++ [newWhile]
+                                    newStep = ExpectFirstFactor in
+                                analyse newStep newContents (newIndex + 1)
+                            Left err ->
+                                Left err
 
             (ExpectWhileCloseBrace cond inner) ->
                 case token of
@@ -466,7 +476,7 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                             newContents = contents ++ [newWhile]
                             newStep = ExpectFirstFactor in
                         analyse newStep newContents (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
@@ -507,8 +517,8 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                         "Expression"
                     (ExpectWhileCloseParentheses _) ->
                         "')'"
-                    (ExpectWhileOpenBrace _) ->
-                        "'{'"
+                    (ExpectWhileOpenBraceOrSyntax _) ->
+                        "'{' or Body"
                     (ExpectWhileCloseBrace _ _) ->
                         "'}'"
 
