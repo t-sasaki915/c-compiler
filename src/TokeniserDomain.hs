@@ -41,4 +41,5 @@ typeKeywords =
 
 acceptableKeywords :: [String]
 acceptableKeywords = typeKeywords ++
-    [ "return", "while", "if", "else" ]
+    [ "return", "while", "if", "else", "continue", "break"
+    ]

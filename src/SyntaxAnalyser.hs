@@ -32,6 +32,8 @@ data Syntax = Program
             | FunctionCallSyntax (Int, Token) [Expression]
             | Return Expression
             | While Expression [Syntax]
+            | Continue
+            | Break
             | If Expression [Syntax] [Syntax]
             deriving (Show, Eq)
 
@@ -198,7 +200,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunOpenBrace t l args) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False (index + 1) of
+                        case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, contents) ->
                                 let newStep = ExpectFunCloseBrace t l args contents in
                                 analyse newStep defs newIndex
@@ -268,6 +270,8 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectWhileCloseParentheses Expression
                   | ExpectWhileOpenBraceOrSyntax Expression
                   | ExpectWhileCloseBrace Expression [Syntax]
+                  | ExpectContinueSemicolon
+                  | ExpectBreakSemicolon
                   | ExpectIfOpenParentheses
                   | ExpectIfCondition
                   | ExpectIfCloseParentheses Expression
@@ -277,9 +281,9 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectElseOpenBraceOrSyntax Expression [Syntax]
                   | ExpectElseCloseBrace Expression [Syntax] [Syntax]
 
-functionAnalyse :: String -> [(Int, Token)] -> Bool -> Int ->
+functionAnalyse :: String -> [(Int, Token)] -> Bool -> Bool -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
-functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
+functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFactor []
     where
     analyse :: FAnalyseStep -> [Syntax] -> Int ->
                Either SyntaxAnalyserError (Int, [Syntax])
@@ -303,6 +307,14 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     (_, Keyword "if") ->
                         let newStep = ExpectIfOpenParentheses in
+                        analyse newStep contents (index + 1)
+
+                    (_, Keyword "continue") | insideLoop ->
+                        let newStep = ExpectContinueSemicolon in
+                        analyse newStep contents (index + 1)
+
+                    (_, Keyword "break") | insideLoop ->
+                        let newStep = ExpectBreakSemicolon in
                         analyse newStep contents (index + 1)
 
                     (_, Keyword k) | k `elem` typeKeywords ->
@@ -466,14 +478,14 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
             (ExpectWhileOpenBraceOrSyntax cond) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False (index + 1) of
+                        case functionAnalyse source tokens False True (index + 1) of
                             Right (newIndex, inner) ->
                                 let newStep = ExpectWhileCloseBrace cond inner in
                                 analyse newStep contents newIndex
                             Left err ->
                                 Left err
                     _ ->
-                        case functionAnalyse source tokens True index of
+                        case functionAnalyse source tokens True True index of
                             Right (newIndex, inner) ->
                                 let newWhile = While cond inner
                                     newContents = contents ++ [newWhile]
@@ -487,6 +499,26 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                     (_, CloseBrace) ->
                         let newWhile = While cond inner
                             newContents = contents ++ [newWhile]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            ExpectContinueSemicolon ->
+                case token of
+                    (_, Semicolon) ->
+                        let newContents = contents ++ [Continue]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+                    
+                    _ -> 
+                        contextualUnexpectedTokenHalt
+
+            ExpectBreakSemicolon ->
+                case token of
+                    (_, Semicolon) ->
+                        let newContents = contents ++ [Break]
                             newStep = ExpectFirstFactor in
                         analyse newStep newContents (index + 1)
 
@@ -522,7 +554,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
             (ExpectIfOpenBraceOrSyntax cond) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False (index + 1) of
+                        case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, inner) ->
                                 let newStep = ExpectIfCloseBrace cond inner in
                                 analyse newStep contents newIndex
@@ -530,7 +562,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                                 Left err
 
                     _ ->
-                        case functionAnalyse source tokens True index of
+                        case functionAnalyse source tokens True False index of
                             Right (newIndex, inner) ->
                                 let newStep = ExpectElseOrEnd cond inner in
                                 analyse newStep contents (newIndex + 1)
@@ -561,7 +593,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
             (ExpectElseOpenBraceOrSyntax cond inner) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False (index + 1) of
+                        case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, elseInner) ->
                                 let newStep = ExpectElseCloseBrace cond inner elseInner in
                                 analyse newStep contents newIndex
@@ -569,7 +601,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                                 Left err
                     
                     _ ->
-                        case functionAnalyse source tokens True index of
+                        case functionAnalyse source tokens True False index of
                             Right (newIndex, elseInner) ->
                                 let newIf = If cond inner elseInner
                                     newContents = contents ++ [newIf]
@@ -630,6 +662,10 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                         "'{' or Body"
                     (ExpectWhileCloseBrace _ _) ->
                         "'}'"
+                    ExpectContinueSemicolon ->
+                        "';'"
+                    ExpectBreakSemicolon ->
+                        "';'"
                     ExpectIfOpenParentheses ->
                         "'('"
                     ExpectIfCondition ->
