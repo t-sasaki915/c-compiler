@@ -8,6 +8,8 @@ module SyntaxAnalyserSpecDomain
     , expect3
     , source4
     , expect4
+    , source5
+    , expect5
     ) where
 
 import SyntaxAnalyser
@@ -117,5 +119,44 @@ expect4 = Right $
                 , VarDefinition (76, Keyword "int") (78, Identifier "c") Nothing
                 ]
                 []
+            ) []
+        ]
+
+source5 :: String
+source5 = unlines
+    [ "int main(void)"
+    , "{"
+    , "    return 0;"
+    , "}"
+    , "int add(int a, int b)"
+    , "{"
+    , "    return a + b;"
+    , "}"
+    ]
+
+expect5 :: Result
+expect5 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (2, Keyword "int")
+                (7, Identifier "main")
+                []
+                [ Return (NumReference (28, Number "0"))
+                ]
+            ) []
+        , SyntaxTree
+            ( FunDefinition
+                (35, Keyword "int")
+                (39, Identifier "add")
+                [ VarDefinition (43, Keyword "int") (45, Identifier "a") Nothing
+                , VarDefinition (50, Keyword "int") (52, Identifier "b") Nothing
+                ]
+                [ Return 
+                    ( Addition
+                        (VarReference (68, Identifier "a"))
+                        (VarReference (72, Identifier "b"))
+                    )
+                ]
             ) []
         ]

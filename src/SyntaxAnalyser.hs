@@ -59,7 +59,7 @@ data AnalyserStep = ExpectVarOrFunType
                   | ExpectFunArgLabel IToken IToken IToken [Syntax]
                   | ExpectFunArgCommaOrEnd IToken IToken IToken IToken [Syntax]
                   | ExpectFunOpenBrace IToken IToken [Syntax]
-                  | ExpectFunCloseBrace IToken IToken [Syntax]
+                  | ExpectFunCloseBrace IToken IToken [Syntax] [Syntax]
 
 syntaxAnalyse :: String -> [(Int, Token)] -> Either SyntaxAnalyserError SyntaxTree
 syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
@@ -113,7 +113,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
 
                     _ ->
                         contextualUnexpectedTokenHalt
-            
+
             (ExpectGlobalVariableDefaultValue t l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
@@ -132,7 +132,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
 
                     _ ->
                         contextualUnexpectedTokenHalt
-            
+
             (ExpectFunArgTypeOrEnd t l) ->
                 case token of
                     (_, Keyword "void") ->
@@ -146,7 +146,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                     (_, CloseParentheses) ->
                         let newStep = ExpectFunOpenBrace t l [] in
                         analyse newStep defs (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
@@ -155,7 +155,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                     (_, CloseParentheses) ->
                         let newStep = ExpectFunOpenBrace t l [] in
                         analyse newStep defs (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
@@ -164,10 +164,10 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                     (_, Keyword k) | k `elem` typeKeywords ->
                         let newStep = ExpectFunArgLabel t l token determined in
                         analyse newStep defs (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
-            
+
             (ExpectFunArgLabel t l at determined) ->
                 case token of
                     (_, Identifier _) ->
@@ -197,20 +197,24 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunOpenBrace t l args) ->
                 case token of
                     (_, OpenBrace) ->
-                        let newStep = ExpectFunCloseBrace t l args in
-                        analyse newStep defs (index + 1)
-                    
+                        case functionAnalyse source tokens (index + 1) of
+                            Right (newIndex, contents) ->
+                                let newStep = ExpectFunCloseBrace t l args contents in
+                                analyse newStep defs newIndex
+                            Left err ->
+                                Left err
+
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            (ExpectFunCloseBrace t l args) ->
+            (ExpectFunCloseBrace t l args contents) ->
                 case token of
                     (_, CloseBrace) ->
-                        let newFunc = SyntaxTree (FunDefinition t l args []) []
+                        let newFunc = SyntaxTree (FunDefinition t l args contents) []
                             newDefs = defs ++ [newFunc]
                             newStep = ExpectVarOrFunType in
                         analyse newStep newDefs (index + 1)
-                    
+
                     _ ->
                         contextualUnexpectedTokenHalt
         where
@@ -246,4 +250,66 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         "'{'"
                     (ExpectFunCloseBrace {}) ->
                         "'}'"
- 
+
+data FAnalyseStep = ExpectFirstFactor
+                  | ExpectReturnExpression
+                  | ExpectReturnSemicolon Expr
+
+functionAnalyse :: String -> [(Int, Token)] -> Int ->
+                   Either SyntaxAnalyserError (Int, [Syntax])
+functionAnalyse source tokens = analyse ExpectFirstFactor []
+    where
+    analyse :: FAnalyseStep -> [Syntax] -> Int ->
+               Either SyntaxAnalyserError (Int, [Syntax])
+    analyse _ _ index | index >= length tokens =
+        Left $ UnexpectedEOF source (fst $ last tokens)
+
+    analyse step contents index =
+        case step of
+            ExpectFirstFactor ->
+                case token of
+                    (_, Keyword "return") ->
+                        let newStep = ExpectReturnExpression in
+                        analyse newStep contents (index + 1)
+
+                    (_, CloseBrace) ->
+                        Right (index, contents)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            ExpectReturnExpression ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = ExpectReturnSemicolon expr in
+                        analyse newStep contents newIndex
+                    
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (ExpectReturnSemicolon e) ->
+                case token of
+                    (_, Semicolon) ->
+                        let newReturn = Return e
+                            newContents = contents ++ [newReturn]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+        where
+        token = tokens !! index
+
+        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError (Int, [Syntax])
+        contextualUnexpectedTokenHalt =
+            Left $ uncurry (UnexpectedToken source) token expectation
+            where
+            expectation =
+                case step of
+                    ExpectFirstFactor ->
+                        "Keyword, Identifier or '}'"
+                    ExpectReturnExpression ->
+                        "Expression"
+                    (ExpectReturnSemicolon _) ->
+                        "';'"
