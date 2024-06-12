@@ -52,4 +52,5 @@ main = do
         , TestLabel "No Expression Return Analysation"          syntaxAnalyserTest6
         , TestLabel "Local Variable Analysation"                syntaxAnalyserTest7
         , TestLabel "Variable Reassign Analysation"             syntaxAnalyserTest8
+        , TestLabel "Function Call In Function Analysation"     syntaxAnalyserTest9
         ]

@@ -16,6 +16,8 @@ module SyntaxAnalyserSpecDomain
     , expect7
     , source8
     , expect8
+    , source9
+    , expect9
     ) where
 
 import SyntaxAnalyser
@@ -246,6 +248,38 @@ expect8 = Right $
                         (VarReference (43, Identifier "a"))
                         (NumReference (47, Number "1"))
                     )
+                ]
+            ) []
+        ]
+
+source9 :: String
+source9 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    bbb();"
+    , "    ccc(1);"
+    , "    ddd(a + b, aaa());"
+    , "}"
+    ]
+
+expect9 :: Result
+expect9 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ FunctionCallSyntax (19, Identifier "bbb") []
+                , FunctionCallSyntax (30, Identifier "ccc")
+                    [ NumReference (32, Number "1")
+                    ]
+                , FunctionCallSyntax (42, Identifier "ddd")
+                    [ Addition 
+                        (VarReference (44, Identifier "a"))
+                        (VarReference (48, Identifier "b"))
+                    , FunctionCall (53, Identifier "aaa") []
+                    ]
                 ]
             ) []
         ]
