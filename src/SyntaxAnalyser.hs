@@ -1,7 +1,6 @@
 module SyntaxAnalyser
   ( SyntaxAnalyserError(..)
   , Syntax(..)
-  , SyntaxTree(..)
   , syntaxAnalyse
   ) where
 
@@ -9,8 +8,6 @@ import ExpressionAnalyser (Expression(..), ExpressionAnalyserError, expressionAn
 import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 import TokeniserDomain (typeKeywords)
-
-import Data.List (intercalate)
 
 data SyntaxAnalyserError = UnexpectedToken String Int Token String
                          | UnexpectedEOF String Int
@@ -25,7 +22,8 @@ instance Show SyntaxAnalyserError where
     show (InvalidExpression e) =
         show e
 
-data Syntax = Program
+data Syntax = Program [Syntax]
+            | Definitions [Syntax]
             | FunDefinition (Int, Token) (Int, Token) [Syntax] [Syntax]
             | VarDefinition (Int, Token) (Int, Token) (Maybe Expression)
             | VarReassign (Int, Token) Expression
@@ -36,17 +34,6 @@ data Syntax = Program
             | Break
             | If Expression [Syntax] [Syntax]
             deriving (Show, Eq)
-
-data SyntaxTree = SyntaxTree
-    { _rootSyntax :: Syntax
-    , _subSyntax :: [SyntaxTree]
-    }
-    deriving Eq
-
-instance Show SyntaxTree where
-    show (SyntaxTree root []) = show root
-    show (SyntaxTree root subs) =
-        show root ++ " [" ++ intercalate ", " (map show subs) ++ "]"
 
 type IToken = (Int, Token)
 type Expr = Expression
@@ -64,14 +51,14 @@ data AnalyserStep = ExpectVarOrFunType
                   | ExpectFunOpenBrace IToken IToken [Syntax]
                   | ExpectFunCloseBrace IToken IToken [Syntax] [Syntax]
 
-syntaxAnalyse :: String -> [(Int, Token)] -> Either SyntaxAnalyserError SyntaxTree
+syntaxAnalyse :: String -> [(Int, Token)] -> Either SyntaxAnalyserError Syntax
 syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
     where
-    analyse :: AnalyserStep -> [SyntaxTree] -> Int -> Either SyntaxAnalyserError SyntaxTree
+    analyse :: AnalyserStep -> [Syntax] -> Int -> Either SyntaxAnalyserError Syntax
     analyse step defs index | index >= length tokens =
         case step of
             ExpectVarOrFunType ->
-                Right $ SyntaxTree Program defs
+                Right $ Program [ Definitions defs ]
 
             _ ->
                 Left $ UnexpectedEOF source (fst $ last tokens)
@@ -81,8 +68,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             ExpectVarOrFunType ->
                 case token of
                     (_, Keyword k) | k `elem` typeKeywords ->
-                        let newStep = ExpectVarOrFunLabel token in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectVarOrFunLabel token
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -90,10 +76,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectVarOrFunLabel t)->
                 case token of
                     (_, Identifier _) ->
-                        let
-                            newStep =
-                                ExpectEqualOrOpenParenthesesOrSemicolon t token in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectEqualOrOpenParenthesesOrSemicolon t token
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -101,18 +84,13 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectEqualOrOpenParenthesesOrSemicolon t l) ->
                 case token of
                     (_, Semicolon) ->
-                        let newStep = ExpectVarOrFunType
-                            newVar = SyntaxTree (VarDefinition t l Nothing) []
-                            newDefs = defs ++ [newVar] in
-                        analyse newStep newDefs (index + 1)
+                        determine $ VarDefinition t l Nothing
 
                     (_, OpenParentheses) ->
-                        let newStep = ExpectFunArgTypeOrEnd t l in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunArgTypeOrEnd t l
 
                     (_, Symbol '=') ->
-                        let newStep = ExpectGlobalVariableDefaultValue t l in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectGlobalVariableDefaultValue t l
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -120,18 +98,15 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectGlobalVariableDefaultValue t l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = ExpectGlobalVariableSemicolon t l expr in
-                        analyse newStep defs newIndex
+                        nextStep' (ExpectGlobalVariableSemicolon t l expr) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
             (ExpectGlobalVariableSemicolon t l d) ->
                 case token of
                     (_, Semicolon) ->
-                        let newStep = ExpectVarOrFunType
-                            newVar = SyntaxTree (VarDefinition t l (Just d)) []
-                            newDefs = defs ++ [newVar] in
-                        analyse newStep newDefs (index + 1)
+                        determine $ VarDefinition t l (Just d)
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -139,16 +114,13 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunArgTypeOrEnd t l) ->
                 case token of
                     (_, Keyword "void") ->
-                        let newStep = ExpectFunArgEnd t l in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunArgEnd t l
 
                     (_, Keyword k) | k `elem` typeKeywords ->
-                        let newStep = ExpectFunArgLabel t l token [] in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunArgLabel t l token []
 
                     (_, CloseParentheses) ->
-                        let newStep = ExpectFunOpenBrace t l [] in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunOpenBrace t l []
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -156,8 +128,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunArgEnd t l) ->
                 case token of
                     (_, CloseParentheses) ->
-                        let newStep = ExpectFunOpenBrace t l [] in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunOpenBrace t l []
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -165,8 +136,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunArgType t l determined) ->
                 case token of
                     (_, Keyword k) | k `elem` typeKeywords ->
-                        let newStep = ExpectFunArgLabel t l token determined in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunArgLabel t l token determined
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -174,8 +144,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunArgLabel t l at determined) ->
                 case token of
                     (_, Identifier _) ->
-                        let newStep = ExpectFunArgCommaOrEnd t l at token determined in
-                        analyse newStep defs (index + 1)
+                        nextStep $ ExpectFunArgCommaOrEnd t l at token determined
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -183,16 +152,12 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunArgCommaOrEnd t l at al determined) ->
                 case token of
                     (_, Comma) ->
-                        let newArg = VarDefinition at al Nothing
-                            args = determined ++ [newArg]
-                            newStep = ExpectFunArgType t l args in
-                        analyse newStep defs (index + 1)
+                        let newArg = VarDefinition at al Nothing in
+                        nextStep $ ExpectFunArgType t l (determined ++ [newArg])
 
                     (_, CloseParentheses) ->
-                        let newArg = VarDefinition at al Nothing
-                            args = determined ++ [newArg]
-                            newStep = ExpectFunOpenBrace t l args in
-                        analyse newStep defs (index + 1)
+                        let newArg = VarDefinition at al Nothing in
+                        nextStep $ ExpectFunOpenBrace t l (determined ++ [newArg])
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -202,8 +167,8 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                     (_, OpenBrace) ->
                         case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, contents) ->
-                                let newStep = ExpectFunCloseBrace t l args contents in
-                                analyse newStep defs newIndex
+                                nextStep' (ExpectFunCloseBrace t l args contents) newIndex
+                                
                             Left err ->
                                 Left err
 
@@ -213,17 +178,23 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunCloseBrace t l args contents) ->
                 case token of
                     (_, CloseBrace) ->
-                        let newFunc = SyntaxTree (FunDefinition t l args contents) []
-                            newDefs = defs ++ [newFunc]
-                            newStep = ExpectVarOrFunType in
-                        analyse newStep newDefs (index + 1)
+                        determine $ FunDefinition t l args contents
 
                     _ ->
                         contextualUnexpectedTokenHalt
         where
         token = tokens !! index
 
-        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError SyntaxTree
+        nextStep' :: AnalyserStep -> Int -> Either SyntaxAnalyserError Syntax
+        nextStep' newStep = analyse newStep defs
+        nextStep :: AnalyserStep -> Either SyntaxAnalyserError Syntax
+        nextStep newStep = nextStep' newStep (index + 1)
+        determine' :: Syntax -> Int -> Either SyntaxAnalyserError Syntax
+        determine' newSyntax = analyse ExpectVarOrFunType (defs ++ [newSyntax])
+        determine :: Syntax -> Either SyntaxAnalyserError Syntax
+        determine newSyntax = determine' newSyntax (index + 1)
+
+        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError Syntax
         contextualUnexpectedTokenHalt =
             Left $ uncurry (UnexpectedToken source) token expectation
             where
@@ -298,32 +269,25 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectFirstFactor ->
                 case token of
                     (_, Keyword "return") ->
-                        let newStep = ExpectReturnExpression in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectReturnExpression
 
                     (_, Keyword "while") ->
-                        let newStep = ExpectWhileOpenParentheses in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectWhileOpenParentheses
 
                     (_, Keyword "if") ->
-                        let newStep = ExpectIfOpenParentheses in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectIfOpenParentheses
 
                     (_, Keyword "continue") | insideLoop ->
-                        let newStep = ExpectContinueSemicolon in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectContinueSemicolon
 
                     (_, Keyword "break") | insideLoop ->
-                        let newStep = ExpectBreakSemicolon in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectBreakSemicolon
 
                     (_, Keyword k) | k `elem` typeKeywords ->
-                        let newStep = ExpectLocalVariableLabel token in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectLocalVariableLabel token
 
                     (_, Identifier _) ->
-                        let newStep = ExpectEqualOrOpenParentheses token in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectEqualOrOpenParentheses token
 
                     (_, CloseBrace) ->
                         Right (index, contents)
@@ -334,16 +298,12 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectReturnExpression ->
                 case token of
                     (_, Semicolon) ->
-                        let newReturn = Return Void
-                            newContents = contents ++ [newReturn]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ Return Void
 
                     _ ->
                         case expressionAnalyse source tokens index of
                             Right (newIndex, expr) ->
-                                let newStep = ExpectReturnSemicolon expr in
-                                analyse newStep contents newIndex
+                                nextStep' (ExpectReturnSemicolon expr) newIndex
 
                             Left err ->
                                 Left $ InvalidExpression err
@@ -351,10 +311,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectReturnSemicolon e) ->
                 case token of
                     (_, Semicolon) ->
-                        let newReturn = Return e
-                            newContents = contents ++ [newReturn]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ Return e
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -362,8 +319,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectLocalVariableLabel t) ->
                 case token of
                     (_, Identifier _) ->
-                        let newStep = ExpectLocalVariableEqualOrSemicolon t token in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectLocalVariableEqualOrSemicolon t token
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -371,14 +327,10 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectLocalVariableEqualOrSemicolon t l) ->
                 case token of
                     (_, Symbol '=') ->
-                        let newStep = ExpectLocalVariableExpression t l in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectLocalVariableExpression t l
 
                     (_, Semicolon) ->
-                        let newVariable = VarDefinition t l Nothing
-                            newContents = contents ++ [newVariable]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ VarDefinition t l Nothing
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -386,18 +338,15 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectLocalVariableExpression t l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = ExpectLocalVariableSemicolon t l expr in
-                        analyse newStep contents newIndex
+                        nextStep' (ExpectLocalVariableSemicolon t l expr) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
             (ExpectLocalVariableSemicolon t l e) ->
                 case token of
                     (_, Semicolon) ->
-                        let newVariable = VarDefinition t l (Just e)
-                            newContents = contents ++ [newVariable]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ VarDefinition t l (Just e)
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -405,14 +354,14 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectEqualOrOpenParentheses l) ->
                 case token of
                     (_, Symbol '=') ->
-                        let newStep = ExpectExpressionToReassignVariable l in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectExpressionToReassignVariable l
 
                     (_, OpenParentheses) ->
                         case functionArgAnalyse source tokens (index + 1) of
                             Right (newIndex, args) ->
-                                let newStep = ExpectFunctionCallSemicolon l args in
-                                analyse newStep contents (newIndex + 1)
+                                nextStep'
+                                    (ExpectFunctionCallSemicolon l args) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
@@ -422,18 +371,15 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectExpressionToReassignVariable l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = ExpectReassignSemicolon l expr in
-                        analyse newStep contents newIndex
+                        nextStep' (ExpectReassignSemicolon l expr) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
             (ExpectReassignSemicolon l e) ->
                 case token of
                     (_, Semicolon) ->
-                        let newReassign = VarReassign l e
-                            newContents = contents ++ [newReassign]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ VarReassign l e
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -441,10 +387,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectFunctionCallSemicolon l args) ->
                 case token of
                     (_, Semicolon) ->
-                        let newFuncCall = FunctionCallSyntax l args
-                            newContents = contents ++ [newFuncCall]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ FunctionCallSyntax l args
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -452,8 +395,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectWhileOpenParentheses ->
                 case token of
                     (_, OpenParentheses) ->
-                        let newStep = ExpectWhileCondition in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectWhileCondition
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -461,16 +403,15 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectWhileCondition ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = ExpectWhileCloseParentheses expr in
-                        analyse newStep contents newIndex
+                        nextStep' (ExpectWhileCloseParentheses expr) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
             (ExpectWhileCloseParentheses cond) ->
                 case token of
                     (_, CloseParentheses) ->
-                        let newStep = ExpectWhileOpenBraceOrSyntax cond in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectWhileOpenBraceOrSyntax cond
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -480,27 +421,22 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                     (_, OpenBrace) ->
                         case functionAnalyse source tokens False True (index + 1) of
                             Right (newIndex, inner) ->
-                                let newStep = ExpectWhileCloseBrace cond inner in
-                                analyse newStep contents newIndex
+                                nextStep' (ExpectWhileCloseBrace cond inner) newIndex
+
                             Left err ->
                                 Left err
                     _ ->
                         case functionAnalyse source tokens True True index of
                             Right (newIndex, inner) ->
-                                let newWhile = While cond inner
-                                    newContents = contents ++ [newWhile]
-                                    newStep = ExpectFirstFactor in
-                                analyse newStep newContents (newIndex + 1)
+                                determine' (While cond inner) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
             (ExpectWhileCloseBrace cond inner) ->
                 case token of
                     (_, CloseBrace) ->
-                        let newWhile = While cond inner
-                            newContents = contents ++ [newWhile]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ While cond inner
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -508,9 +444,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectContinueSemicolon ->
                 case token of
                     (_, Semicolon) ->
-                        let newContents = contents ++ [Continue]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine Continue
                     
                     _ -> 
                         contextualUnexpectedTokenHalt
@@ -518,9 +452,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectBreakSemicolon ->
                 case token of
                     (_, Semicolon) ->
-                        let newContents = contents ++ [Break]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine Break
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -528,8 +460,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectIfOpenParentheses ->
                 case token of
                     (_, OpenParentheses) ->
-                        let newStep = ExpectIfCondition in
-                        analyse newStep contents (index + 1)
+                        nextStep ExpectIfCondition
                     
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -537,16 +468,15 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             ExpectIfCondition ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let newStep = ExpectIfCloseParentheses expr in
-                        analyse newStep contents newIndex
+                        nextStep' (ExpectIfCloseParentheses expr) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
             (ExpectIfCloseParentheses cond) ->
                 case token of
                     (_, CloseParentheses) ->
-                        let newStep = ExpectIfOpenBraceOrSyntax cond in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectIfOpenBraceOrSyntax cond
 
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -556,24 +486,23 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                     (_, OpenBrace) ->
                         case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, inner) ->
-                                let newStep = ExpectIfCloseBrace cond inner in
-                                analyse newStep contents newIndex
+                                nextStep' (ExpectIfCloseBrace cond inner) newIndex
+
                             Left err ->
                                 Left err
 
                     _ ->
                         case functionAnalyse source tokens True False index of
                             Right (newIndex, inner) ->
-                                let newStep = ExpectElseOrEnd cond inner in
-                                analyse newStep contents (newIndex + 1)
+                                nextStep' (ExpectElseOrEnd cond inner) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
             (ExpectIfCloseBrace cond inner) ->
                 case token of
                     (_, CloseBrace) ->
-                        let newStep = ExpectElseOrEnd cond inner in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectElseOrEnd cond inner
                     
                     _ ->
                         contextualUnexpectedTokenHalt
@@ -581,48 +510,49 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectElseOrEnd cond inner) ->
                 case token of
                     (_, Keyword "else") ->
-                        let newStep = ExpectElseOpenBraceOrSyntax cond inner in
-                        analyse newStep contents (index + 1)
+                        nextStep $ ExpectElseOpenBraceOrSyntax cond inner
 
                     _ ->
-                        let newIf = If cond inner []
-                            newContents = contents ++ [newIf]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents index
+                        determine' (If cond inner []) index
 
             (ExpectElseOpenBraceOrSyntax cond inner) ->
                 case token of
                     (_, OpenBrace) ->
                         case functionAnalyse source tokens False False (index + 1) of
                             Right (newIndex, elseInner) ->
-                                let newStep = ExpectElseCloseBrace cond inner elseInner in
-                                analyse newStep contents newIndex
+                                nextStep'
+                                    (ExpectElseCloseBrace cond inner elseInner) newIndex
+
                             Left err ->
                                 Left err
                     
                     _ ->
                         case functionAnalyse source tokens True False index of
                             Right (newIndex, elseInner) ->
-                                let newIf = If cond inner elseInner
-                                    newContents = contents ++ [newIf]
-                                    newStep = ExpectFirstFactor in
-                                analyse newStep newContents (newIndex + 1)
+                                determine' (If cond inner elseInner) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
             (ExpectElseCloseBrace cond inner elseInner) ->
                 case token of
                     (_, CloseBrace) ->
-                        let newIf = If cond inner elseInner
-                            newContents = contents ++ [newIf]
-                            newStep = ExpectFirstFactor in
-                        analyse newStep newContents (index + 1)
+                        determine $ If cond inner elseInner
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
         where
         token = tokens !! index
+
+        nextStep' :: FAnalyseStep -> Int -> Either SyntaxAnalyserError (Int, [Syntax])
+        nextStep' newStep = analyse newStep contents
+        nextStep :: FAnalyseStep -> Either SyntaxAnalyserError (Int, [Syntax])
+        nextStep newStep = nextStep' newStep (index + 1)
+        determine' :: Syntax -> Int -> Either SyntaxAnalyserError (Int, [Syntax])
+        determine' newContent = analyse ExpectFirstFactor (contents ++ [newContent])
+        determine :: Syntax -> Either SyntaxAnalyserError (Int, [Syntax])
+        determine newContent = determine' newContent (index + 1)
 
         contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError (Int, [Syntax])
         contextualUnexpectedTokenHalt =

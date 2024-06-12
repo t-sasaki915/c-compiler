@@ -32,7 +32,7 @@ import SyntaxAnalyser
 import Tokeniser (Token(..))
 import ExpressionAnalyser (Expression(..))
 
-type Result = Either SyntaxAnalyserError SyntaxTree
+type Result = Either SyntaxAnalyserError Syntax
 
 source1 :: String
 source1 = unlines
@@ -43,10 +43,12 @@ source1 = unlines
 
 expect1 :: Result
 expect1 = Right $
-    SyntaxTree Program
-        [ SyntaxTree (VarDefinition (2, Keyword "int") (4, Identifier "a") Nothing) []
-        , SyntaxTree (VarDefinition (9, Keyword "int") (11, Identifier "b") Nothing) []
-        , SyntaxTree (VarDefinition (17, Keyword "void") (19, Identifier "c") Nothing) []
+    Program
+        [ Definitions
+            [ VarDefinition (2, Keyword "int") (4, Identifier "a") Nothing
+            , VarDefinition (9, Keyword "int") (11, Identifier "b") Nothing
+            , VarDefinition (17, Keyword "void") (19, Identifier "c") Nothing
+            ]
         ]
 
 source2 :: String
@@ -58,11 +60,11 @@ source2 = unlines
 
 expect2 :: Result
 expect2 = Right $
-    SyntaxTree Program
-        [ SyntaxTree (VarDefinition (2, Keyword "int") (4, Identifier "a") Nothing) []
-        , SyntaxTree (VarDefinition (9, Keyword "int") (11, Identifier "b") Nothing) []
-        , SyntaxTree
-            ( VarDefinition
+    Program
+        [ Definitions
+            [ VarDefinition (2, Keyword "int") (4, Identifier "a") Nothing
+            , VarDefinition (9, Keyword "int") (11, Identifier "b") Nothing
+            , VarDefinition
                 (16, Keyword "int")
                 (18, Identifier "c")
                 ( Just
@@ -71,7 +73,7 @@ expect2 = Right $
                         (VarReference (26, Identifier "b"))
                     )
                 )
-            ) []
+            ]
         ]
 
 source3 :: String
@@ -82,21 +84,19 @@ source3 = unlines
 
 expect3 :: Result
 expect3 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (2, Keyword "int")
                 (7, Identifier "main")
                 []
                 []
-            ) []
-        , SyntaxTree
-            ( FunDefinition
+            , FunDefinition
                 (21, Keyword "void")
                 (31, Identifier "doNothing")
                 []
                 []
-            ) []
+            ]
         ]
 
 source4 :: String
@@ -108,26 +108,22 @@ source4 = unlines
 
 expect4 :: Result
 expect4 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (2, Keyword "int")
                 (10, Identifier "isPrime")
                 [ VarDefinition (14, Keyword "int") (16, Identifier "x") Nothing
                 ]
                 []
-            ) []
-        , SyntaxTree
-            ( FunDefinition
+            , FunDefinition
                 (24, Keyword "int")
                 (28, Identifier "add")
                 [ VarDefinition (32, Keyword "int") (34, Identifier "a") Nothing
                 , VarDefinition (39, Keyword "int") (41, Identifier "b") Nothing
                 ]
                 []
-            ) []
-        , SyntaxTree
-            ( FunDefinition
+            , FunDefinition
                 (49, Keyword "int")
                 (58, Identifier "largest3")
                 [ VarDefinition (62, Keyword "int") (64, Identifier "a") Nothing
@@ -135,7 +131,7 @@ expect4 = Right $
                 , VarDefinition (76, Keyword "int") (78, Identifier "c") Nothing
                 ]
                 []
-            ) []
+            ]
         ]
 
 source5 :: String
@@ -152,17 +148,15 @@ source5 = unlines
 
 expect5 :: Result
 expect5 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (2, Keyword "int")
                 (7, Identifier "main")
                 []
                 [ Return (NumReference (28, Number "0"))
                 ]
-            ) []
-        , SyntaxTree
-            ( FunDefinition
+            , FunDefinition
                 (35, Keyword "int")
                 (39, Identifier "add")
                 [ VarDefinition (43, Keyword "int") (45, Identifier "a") Nothing
@@ -174,7 +168,7 @@ expect5 = Right $
                         (VarReference (72, Identifier "b"))
                     )
                 ]
-            ) []
+            ]
         ]
 
 source6 :: String
@@ -187,15 +181,15 @@ source6 = unlines
 
 expect6 :: Result
 expect6 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (13, Identifier "doNothing")
                 []
                 [ Return Void
                 ]
-            ) []
+            ]
         ]
 
 source7 :: String
@@ -211,9 +205,9 @@ source7 = unlines
 
 expect7 :: Result
 expect7 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (2, Keyword "int")
                 (6, Identifier "aaa")
                 []
@@ -228,7 +222,7 @@ expect7 = Right $
                     )
                 , Return (VarReference (68, Identifier "c"))
                 ]
-            ) []
+            ]
         ]
 
 source8 :: String
@@ -243,9 +237,9 @@ source8 = unlines
 
 expect8 :: Result
 expect8 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -257,7 +251,7 @@ expect8 = Right $
                         (NumReference (47, Number "1"))
                     )
                 ]
-            ) []
+            ]
         ]
 
 source9 :: String
@@ -272,9 +266,9 @@ source9 = unlines
 
 expect9 :: Result
 expect9 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -289,7 +283,7 @@ expect9 = Right $
                     , FunctionCall (53, Identifier "aaa") []
                     ]
                 ]
-            ) []
+            ]
         ]
 
 source10 :: String
@@ -305,9 +299,9 @@ source10 = unlines
 
 expect10 :: Result
 expect10 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -319,7 +313,7 @@ expect10 = Right $
                     [ FunctionCallSyntax (47, Identifier "bbb") []
                     ]
                 ]
-            ) []
+            ]
         ]
 
 source11 :: String
@@ -338,9 +332,9 @@ source11 = unlines
 
 expect11 :: Result
 expect11 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -353,7 +347,7 @@ expect11 = Right $
                         ]
                     ]
                 ]
-            ) []
+            ]
         ]
 
 source12 :: String
@@ -377,9 +371,9 @@ source12 = unlines
 
 expect12 :: Result
 expect12 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -393,7 +387,7 @@ expect12 = Right $
                     [ FunctionCallSyntax (114, Identifier "ccc") []
                     ]
                 ]
-            ) []
+            ]
         ]
 
 source13 :: String
@@ -412,9 +406,9 @@ source13 = unlines
 
 expect13 :: Result
 expect13 = Right $
-    SyntaxTree Program
-        [ SyntaxTree
-            ( FunDefinition
+    Program
+        [ Definitions
+            [ FunDefinition
                 (3, Keyword "void")
                 (7, Identifier "aaa")
                 []
@@ -432,5 +426,5 @@ expect13 = Right $
                         []
                     ]
                 ]
-            ) []
+            ]
         ]
