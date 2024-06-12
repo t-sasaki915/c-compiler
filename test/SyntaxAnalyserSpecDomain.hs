@@ -14,6 +14,8 @@ module SyntaxAnalyserSpecDomain
     , expect6
     , source7
     , expect7
+    , source8
+    , expect8
     ) where
 
 import SyntaxAnalyser
@@ -215,6 +217,35 @@ expect7 = Right $
                         )
                     )
                 , Return (VarReference (68, Identifier "c"))
+                ]
+            ) []
+        ]
+
+source8 :: String
+source8 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    int a;"
+    , "    a = 0;"
+    , "    a = a + 1;"
+    , "}"
+    ]
+
+expect8 :: Result
+expect8 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ VarDefinition (19, Keyword "int") (21, Identifier "a") Nothing
+                , VarReassign (28, Identifier "a") (NumReference (32, Number "0"))
+                , VarReassign (39, Identifier "a")
+                    ( Addition
+                        (VarReference (43, Identifier "a"))
+                        (NumReference (47, Number "1"))
+                    )
                 ]
             ) []
         ]

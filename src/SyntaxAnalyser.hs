@@ -26,11 +26,9 @@ instance Show SyntaxAnalyserError where
         show e
 
 data Syntax = Program
-            -- FunDefinition Type Identifier [ArgumentVariableDef] [Content]
             | FunDefinition (Int, Token) (Int, Token) [Syntax] [Syntax]
-            -- VarDefinition Type Identifier (Maybe DefaultValue)
             | VarDefinition (Int, Token) (Int, Token) (Maybe Expression)
-            -- Return Value
+            | VarReassign (Int, Token) Expression
             | Return Expression
             deriving (Show, Eq)
 
@@ -258,6 +256,9 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectLocalVariableEqualOrSemicolon IToken IToken
                   | ExpectLocalVariableExpression IToken IToken
                   | ExpectLocalVariableSemicolon IToken IToken Expr
+                  | ExpectReassignEqual IToken
+                  | ExpectExpressionToReassignVariable IToken
+                  | ExpectReassignSemicolon IToken Expr
 
 functionAnalyse :: String -> [(Int, Token)] -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
@@ -278,6 +279,10 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
 
                     (_, Keyword k) | k `elem` typeKeywords ->
                         let newStep = ExpectLocalVariableLabel token in
+                        analyse newStep contents (index + 1)
+
+                    (_, Identifier _) ->
+                        let newStep = ExpectReassignEqual token in
                         analyse newStep contents (index + 1)
 
                     (_, CloseBrace) ->
@@ -357,6 +362,34 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     _ ->
                         contextualUnexpectedTokenHalt
 
+            (ExpectReassignEqual l) ->
+                case token of
+                    (_, Symbol '=') ->
+                        let newStep = ExpectExpressionToReassignVariable l in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectExpressionToReassignVariable l) ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = ExpectReassignSemicolon l expr in
+                        analyse newStep contents newIndex
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (ExpectReassignSemicolon l e) ->
+                case token of
+                    (_, Semicolon) ->
+                        let newReassign = VarReassign l e
+                            newContents = contents ++ [newReassign]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
         where
         token = tokens !! index
 
@@ -379,4 +412,10 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     (ExpectLocalVariableExpression {}) ->
                         "Expression"
                     (ExpectLocalVariableSemicolon {}) ->
+                        "';'"
+                    (ExpectReassignEqual _) ->
+                        "'='"
+                    (ExpectExpressionToReassignVariable _) ->
+                        "Expression"
+                    (ExpectReassignSemicolon {}) ->
                         "';'"
