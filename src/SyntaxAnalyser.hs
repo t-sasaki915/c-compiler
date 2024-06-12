@@ -32,6 +32,7 @@ data Syntax = Program
             | FunctionCallSyntax (Int, Token) [Expression]
             | Return Expression
             | While Expression [Syntax]
+            | If Expression [Syntax] [Syntax]
             deriving (Show, Eq)
 
 data SyntaxTree = SyntaxTree
@@ -267,6 +268,14 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectWhileCloseParentheses Expression
                   | ExpectWhileOpenBraceOrSyntax Expression
                   | ExpectWhileCloseBrace Expression [Syntax]
+                  | ExpectIfOpenParentheses
+                  | ExpectIfCondition
+                  | ExpectIfCloseParentheses Expression
+                  | ExpectIfOpenBraceOrSyntax Expression
+                  | ExpectIfCloseBrace Expression [Syntax]
+                  | ExpectElseOrEnd Expression [Syntax]
+                  | ExpectElseOpenBraceOrSyntax Expression [Syntax]
+                  | ExpectElseCloseBrace Expression [Syntax] [Syntax]
 
 functionAnalyse :: String -> [(Int, Token)] -> Bool -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
@@ -290,6 +299,10 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     (_, Keyword "while") ->
                         let newStep = ExpectWhileOpenParentheses in
+                        analyse newStep contents (index + 1)
+
+                    (_, Keyword "if") ->
+                        let newStep = ExpectIfOpenParentheses in
                         analyse newStep contents (index + 1)
 
                     (_, Keyword k) | k `elem` typeKeywords ->
@@ -479,6 +492,102 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     _ ->
                         contextualUnexpectedTokenHalt
+            
+            ExpectIfOpenParentheses ->
+                case token of
+                    (_, OpenParentheses) ->
+                        let newStep = ExpectIfCondition in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            ExpectIfCondition ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = ExpectIfCloseParentheses expr in
+                        analyse newStep contents newIndex
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (ExpectIfCloseParentheses cond) ->
+                case token of
+                    (_, CloseParentheses) ->
+                        let newStep = ExpectIfOpenBraceOrSyntax cond in
+                        analyse newStep contents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectIfOpenBraceOrSyntax cond) ->
+                case token of
+                    (_, OpenBrace) ->
+                        case functionAnalyse source tokens False (index + 1) of
+                            Right (newIndex, inner) ->
+                                let newStep = ExpectIfCloseBrace cond inner in
+                                analyse newStep contents newIndex
+                            Left err ->
+                                Left err
+
+                    _ ->
+                        case functionAnalyse source tokens True index of
+                            Right (newIndex, inner) ->
+                                let newStep = ExpectElseOrEnd cond inner in
+                                analyse newStep contents (newIndex + 1)
+                            Left err ->
+                                Left err
+
+            (ExpectIfCloseBrace cond inner) ->
+                case token of
+                    (_, CloseBrace) ->
+                        let newStep = ExpectElseOrEnd cond inner in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectElseOrEnd cond inner) ->
+                case token of
+                    (_, Keyword "else") ->
+                        let newStep = ExpectElseOpenBraceOrSyntax cond inner in
+                        analyse newStep contents (index + 1)
+
+                    _ ->
+                        let newIf = If cond inner []
+                            newContents = contents ++ [newIf]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents index
+
+            (ExpectElseOpenBraceOrSyntax cond inner) ->
+                case token of
+                    (_, OpenBrace) ->
+                        case functionAnalyse source tokens False (index + 1) of
+                            Right (newIndex, elseInner) ->
+                                let newStep = ExpectElseCloseBrace cond inner elseInner in
+                                analyse newStep contents newIndex
+                            Left err ->
+                                Left err
+                    
+                    _ ->
+                        case functionAnalyse source tokens True index of
+                            Right (newIndex, elseInner) ->
+                                let newIf = If cond inner elseInner
+                                    newContents = contents ++ [newIf]
+                                    newStep = ExpectFirstFactor in
+                                analyse newStep newContents (newIndex + 1)
+                            Left err ->
+                                Left err
+
+            (ExpectElseCloseBrace cond inner elseInner) ->
+                case token of
+                    (_, CloseBrace) ->
+                        let newIf = If cond inner elseInner
+                            newContents = contents ++ [newIf]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
 
         where
         token = tokens !! index
@@ -520,6 +629,22 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                     (ExpectWhileOpenBraceOrSyntax _) ->
                         "'{' or Body"
                     (ExpectWhileCloseBrace _ _) ->
+                        "'}'"
+                    ExpectIfOpenParentheses ->
+                        "'('"
+                    ExpectIfCondition ->
+                        "Expression"
+                    (ExpectIfCloseParentheses _) ->
+                        "')'"
+                    (ExpectIfOpenBraceOrSyntax _) ->
+                        "'{' or Body"
+                    (ExpectIfCloseBrace _ _) ->
+                        "'}'"
+                    (ExpectElseOrEnd _ _) ->
+                        "'else' or Body"
+                    (ExpectElseOpenBraceOrSyntax _ _) ->
+                        "'{' or Body"
+                    (ExpectElseCloseBrace {}) ->
                         "'}'"
 
 data AAnalyseStep = ExpectArgumentOrEnd

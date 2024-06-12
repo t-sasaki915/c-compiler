@@ -55,4 +55,6 @@ main = do
         , TestLabel "Function Call In Function Analysation"     syntaxAnalyserTest9
         , TestLabel "While Syntax Analysation"                  syntaxAnalyserTest10
         , TestLabel "Braces Reduced While Syntax Analysation"   syntaxAnalyserTest11
+        , TestLabel "If-Else Syntax Analysation"                syntaxAnalyserTest12
+        , TestLabel "Braces Reduced If-Else Syntax Analysation" syntaxAnalyserTest13
         ]

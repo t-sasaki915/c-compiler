@@ -22,6 +22,10 @@ module SyntaxAnalyserSpecDomain
     , expect10
     , source11
     , expect11
+    , source12
+    , expect12
+    , source13
+    , expect13
     ) where
 
 import SyntaxAnalyser
@@ -347,6 +351,85 @@ expect11 = Right $
                     [ While (VarReference (71, Identifier "c"))
                         [ FunctionCallSyntax (98, Identifier "ccc") []
                         ]
+                    ]
+                ]
+            ) []
+        ]
+
+source12 :: String
+source12 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    if (a)"
+    , "    {"
+    , "        aaa();"
+    , "    }"
+    , "    if (b)"
+    , "    {"
+    , "        bbb();"
+    , "    }"
+    , "    else"
+    , "    {"
+    , "        ccc();"
+    , "    }"
+    , "}"
+    ]
+
+expect12 :: Result
+expect12 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ If (VarReference (21, Identifier "a"))
+                    [ FunctionCallSyntax (40, Identifier "aaa") []
+                    ]
+                    []
+                , If (VarReference (59, Identifier "b"))
+                    [ FunctionCallSyntax (78, Identifier "bbb") []
+                    ]
+                    [ FunctionCallSyntax (114, Identifier "ccc") []
+                    ]
+                ]
+            ) []
+        ]
+
+source13 :: String
+source13 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    if (a)"
+    , "        aaa();"
+    , "    bbb();"
+    , "    if (b)"
+    , "        ccc();"
+    , "    else if (c)"
+    , "        ddd();"
+    , "}"
+    ]
+
+expect13 :: Result
+expect13 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ If (VarReference (21, Identifier "a"))
+                    [ FunctionCallSyntax (34, Identifier "aaa") []
+                    ]
+                    []
+                , FunctionCallSyntax (45, Identifier "bbb") []
+                , If (VarReference (58, Identifier "b"))
+                    [ FunctionCallSyntax (71, Identifier "ccc") []
+                    ]
+                    [ If (VarReference (89, Identifier "c"))
+                        [ FunctionCallSyntax (102, Identifier "ddd") []
+                        ]
+                        []
                     ]
                 ]
             ) []
