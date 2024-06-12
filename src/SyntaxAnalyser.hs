@@ -31,6 +31,7 @@ data Syntax = Program
             | VarReassign (Int, Token) Expression
             | FunctionCallSyntax (Int, Token) [Expression]
             | Return Expression
+            | While Expression [Syntax]
             deriving (Show, Eq)
 
 data SyntaxTree = SyntaxTree
@@ -261,6 +262,11 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectExpressionToReassignVariable IToken
                   | ExpectReassignSemicolon IToken Expr
                   | ExpectFunctionCallSemicolon IToken [Expression]
+                  | ExpectWhileOpenParentheses
+                  | ExpectWhileCondition
+                  | ExpectWhileCloseParentheses Expression
+                  | ExpectWhileOpenBrace Expression
+                  | ExpectWhileCloseBrace Expression [Syntax]
 
 functionAnalyse :: String -> [(Int, Token)] -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
@@ -277,6 +283,10 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                 case token of
                     (_, Keyword "return") ->
                         let newStep = ExpectReturnExpression in
+                        analyse newStep contents (index + 1)
+
+                    (_, Keyword "while") ->
+                        let newStep = ExpectWhileOpenParentheses in
                         analyse newStep contents (index + 1)
 
                     (_, Keyword k) | k `elem` typeKeywords ->
@@ -411,6 +421,55 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     _ ->
                         contextualUnexpectedTokenHalt
 
+            ExpectWhileOpenParentheses ->
+                case token of
+                    (_, OpenParentheses) ->
+                        let newStep = ExpectWhileCondition in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            ExpectWhileCondition ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = ExpectWhileCloseParentheses expr in
+                        analyse newStep contents newIndex
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (ExpectWhileCloseParentheses cond) ->
+                case token of
+                    (_, CloseParentheses) ->
+                        let newStep = ExpectWhileOpenBrace cond in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectWhileOpenBrace cond) ->
+                case token of
+                    (_, OpenBrace) ->
+                        case functionAnalyse source tokens (index + 1) of
+                            Right (newIndex, inner) ->
+                                let newStep = ExpectWhileCloseBrace cond inner in
+                                analyse newStep contents newIndex
+                            Left err ->
+                                Left err
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectWhileCloseBrace cond inner) ->
+                case token of
+                    (_, CloseBrace) ->
+                        let newWhile = While cond inner
+                            newContents = contents ++ [newWhile]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
         where
         token = tokens !! index
 
@@ -442,6 +501,16 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                         "';'"
                     (ExpectFunctionCallSemicolon {}) ->
                         "';'"
+                    ExpectWhileOpenParentheses ->
+                        "'('"
+                    ExpectWhileCondition ->
+                        "Expression"
+                    (ExpectWhileCloseParentheses _) ->
+                        "')'"
+                    (ExpectWhileOpenBrace _) ->
+                        "'{'"
+                    (ExpectWhileCloseBrace _ _) ->
+                        "'}'"
 
 data AAnalyseStep = ExpectArgumentOrEnd
                   | ExpectCommaOrEnd

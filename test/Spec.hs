@@ -53,4 +53,5 @@ main = do
         , TestLabel "Local Variable Analysation"                syntaxAnalyserTest7
         , TestLabel "Variable Reassign Analysation"             syntaxAnalyserTest8
         , TestLabel "Function Call In Function Analysation"     syntaxAnalyserTest9
+        , TestLabel "While Syntax Analysation"                  syntaxAnalyserTest10
         ]
