@@ -185,18 +185,11 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
         where
         token = tokens !! index
 
-        nextStep' :: AnalyserStep -> Int -> Either SyntaxAnalyserError Syntax
         nextStep' newStep = analyse newStep defs
-        nextStep :: AnalyserStep -> Either SyntaxAnalyserError Syntax
         nextStep newStep = nextStep' newStep (index + 1)
-        determine' :: Syntax -> Int -> Either SyntaxAnalyserError Syntax
         determine' newSyntax = analyse ExpectVarOrFunType (defs ++ [newSyntax])
-        determine :: Syntax -> Either SyntaxAnalyserError Syntax
         determine newSyntax = determine' newSyntax (index + 1)
-
-        unexpectedTokenHalt :: String -> Either SyntaxAnalyserError Syntax
-        unexpectedTokenHalt expectation =
-            Left $ uncurry (UnexpectedToken source) token expectation
+        unexpectedTokenHalt e = Left $ uncurry (UnexpectedToken source) token e
 
 data FAnalyseStep = ExpectFirstFactor
                   | ExpectReturnExpression
@@ -518,18 +511,11 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
         where
         token = tokens !! index
 
-        nextStep' :: FAnalyseStep -> Int -> Either SyntaxAnalyserError (Int, [Syntax])
         nextStep' newStep = analyse newStep contents
-        nextStep :: FAnalyseStep -> Either SyntaxAnalyserError (Int, [Syntax])
         nextStep newStep = nextStep' newStep (index + 1)
-        determine' :: Syntax -> Int -> Either SyntaxAnalyserError (Int, [Syntax])
         determine' newContent = analyse ExpectFirstFactor (contents ++ [newContent])
-        determine :: Syntax -> Either SyntaxAnalyserError (Int, [Syntax])
         determine newContent = determine' newContent (index + 1)
-
-        unexpectedTokenHalt :: String -> Either SyntaxAnalyserError (Int, [Syntax])
-        unexpectedTokenHalt expectation =
-            Left $ uncurry (UnexpectedToken source) token expectation
+        unexpectedTokenHalt e = Left $ uncurry (UnexpectedToken source) token e
 
 data AAnalyseStep = ExpectArgumentOrEnd
                   | ExpectCommaOrEnd

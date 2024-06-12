@@ -61,23 +61,21 @@ expressionAnalyse source tokens =
                     (_, OpenParentheses) ->
                         case expressionAnalyse source tokens (index + 1) of
                             Right (newIndex, expr) ->
-                                let newStep = ExpectCalcSymbolOrEnd expr in
-                                analyse newStep (newIndex + 1)
+                                nextStep' (ExpectCalcSymbolOrEnd expr) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
                     (_, Identifier _) ->
                         case functionCallAnalyse source tokens index of
                             Right (newIndex, expr) ->
-                                let newStep = ExpectCalcSymbolOrEnd expr in
-                                analyse newStep (newIndex + 1)
+                                nextStep' (ExpectCalcSymbolOrEnd expr) (newIndex + 1)
+
                             Left err ->
                                 Left err
 
                     (_, Number _) ->
-                        let expr = NumReference token
-                            newStep = ExpectCalcSymbolOrEnd expr in
-                        analyse newStep (index + 1)
+                        nextStep $ ExpectCalcSymbolOrEnd (NumReference token)
 
                     (_, Symbol '!') ->
                         scheduleSingleExprCalculation Opposition
@@ -86,7 +84,7 @@ expressionAnalyse source tokens =
                         scheduleSingleExprCalculation Negative
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'(', '!', '-', Identifier or Number"
 
             (ExpectExpressionToDoSingleExprCalculation f) ->
                 singleExprCalculation f
@@ -139,25 +137,27 @@ expressionAnalyse source tokens =
                         scheduleBasicCalculation LessThan e
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';', ')', ',' or Calculation Symbol"
 
             (ExpectExpressionToDoBasicCalculation calc e) ->
                 basicCalculation calc e
         where
         token = tokens !! index
 
+        nextStep' = analyse
+        nextStep newStep = nextStep' newStep (index + 1)
+        unexpectedTokenHalt e = Left $ uncurry (UnexpectedToken source) token e
+
         scheduleBasicCalculation :: (Expression -> Expression -> Expression) ->
                                     Expression ->
                                     Either ExpressionAnalyserError (Int, Expression)
         scheduleBasicCalculation f e =
-            let newStep = ExpectExpressionToDoBasicCalculation f e in
-            analyse newStep (index + 1)
+            nextStep $ ExpectExpressionToDoBasicCalculation f e
 
         scheduleSingleExprCalculation :: (Expression -> Expression) ->
                                          Either ExpressionAnalyserError (Int, Expression)
         scheduleSingleExprCalculation f =
-            let newStep = ExpectExpressionToDoSingleExprCalculation f in
-            analyse newStep (index + 1)
+            nextStep $ ExpectExpressionToDoSingleExprCalculation f
 
         basicCalculation :: (Expression -> Expression -> Expression) ->
                             Expression -> Either ExpressionAnalyserError (Int, Expression)
@@ -166,28 +166,24 @@ expressionAnalyse source tokens =
                 (_, OpenParentheses) ->
                     case expressionAnalyse source tokens (index + 1) of
                         Right (newIndex, expr) ->
-                            let newExpr = f e expr
-                                newStep = ExpectCalcSymbolOrEnd newExpr in
-                            analyse newStep (newIndex + 1)
+                            nextStep' (ExpectCalcSymbolOrEnd (f e expr)) (newIndex + 1)
+
                         Left err ->
                             Left err
 
                 (_, Identifier _) ->
                     case functionCallAnalyse source tokens index of
                         Right (newIndex, expr) ->
-                            let newExpr = f e expr
-                                newStep = ExpectCalcSymbolOrEnd newExpr in
-                            analyse newStep (newIndex + 1)
+                            nextStep' (ExpectCalcSymbolOrEnd (f e expr)) (newIndex + 1)
+
                         Left err ->
                             Left err
 
                 (_, Number _) ->
-                    let expr = f e (NumReference token)
-                        newStep = ExpectCalcSymbolOrEnd expr in
-                    analyse newStep (index + 1)
+                    nextStep $ ExpectCalcSymbolOrEnd (f e (NumReference token))
 
                 _ ->
-                    contextualUnexpectedTokenHalt
+                    unexpectedTokenHalt "'(', Identifier or Number"
 
         singleExprCalculation :: (Expression -> Expression) ->
                                  Either ExpressionAnalyserError (Int, Expression)
@@ -196,130 +192,95 @@ expressionAnalyse source tokens =
                 (_, OpenParentheses) ->
                     case expressionAnalyse source tokens (index + 1) of
                         Right (newIndex, expr) ->
-                            let newExpr = f expr
-                                newStep = ExpectCalcSymbolOrEnd newExpr in
-                            analyse newStep (newIndex + 1)
+                            nextStep' (ExpectCalcSymbolOrEnd (f expr)) (newIndex + 1)
+
                         Left err ->
                             Left err
 
                 (_, Identifier _) ->
                     case functionCallAnalyse source tokens index of
                         Right (newIndex, expr) ->
-                            let newExpr = f expr
-                                newStep = ExpectCalcSymbolOrEnd newExpr in
-                            analyse newStep (newIndex + 1)
+                            nextStep' (ExpectCalcSymbolOrEnd (f expr)) (newIndex + 1)
+
                         Left err ->
                             Left err
-                    
+
                 (_, Number _) ->
-                    let newExpr = f (NumReference token)
-                        newStep = ExpectCalcSymbolOrEnd newExpr in
-                    analyse newStep (index + 1)
+                    nextStep $ ExpectCalcSymbolOrEnd (f (NumReference token))
 
                 _ ->
-                    contextualUnexpectedTokenHalt
-
-        contextualUnexpectedTokenHalt :: Either ExpressionAnalyserError (Int, Expression)
-        contextualUnexpectedTokenHalt =
-            Left $ uncurry (UnexpectedToken source) token expectation
-            where
-            expectation =
-                case step of
-                    ExpectOpenParenthesesOrIdentifierOrNumber ->
-                        "'(', Identifier or Number"
-                    (ExpectExpressionToDoSingleExprCalculation _) ->
-                        "Expression"
-                    (ExpectCalcSymbolOrEnd _) ->
-                        "Calculation Symbol, ')', ',' or ';'"
-                    (ExpectExpressionToDoBasicCalculation _ _) ->
-                        "Expression"
+                    unexpectedTokenHalt "'(', Identifier or Number"
 
 
 data FAnalyserStep = ExpectIdentifier
                    | ExpectOpenParentheses (Int, Token)
-                   | ExpectArgOrCloseParentheses (Int, Token) [Expression]
-                   | ExpectArgument (Int, Token) [Expression]
-                   | ExpectCommaOrCloseParentheses (Int, Token) [Expression]
+                   | ExpectArgOrCloseParentheses (Int, Token)
+                   | ExpectArgument (Int, Token)
+                   | ExpectCommaOrCloseParentheses (Int, Token)
 
 functionCallAnalyse :: String -> [(Int, Token)] -> Int ->
                        Either ExpressionAnalyserError (Int, Expression)
-functionCallAnalyse source tokens = analyse ExpectIdentifier
+functionCallAnalyse source tokens = analyse ExpectIdentifier []
     where
-    analyse :: FAnalyserStep -> Int -> Either ExpressionAnalyserError (Int, Expression)
-    analyse _ index | index >= length tokens =
+    analyse :: FAnalyserStep -> [Expression] -> Int ->
+               Either ExpressionAnalyserError (Int, Expression)
+    analyse _  _ index | index >= length tokens =
         Left $ UnexpectedEOF source (fst $ last tokens)
 
-    analyse step index =
+    analyse step args index =
         case step of
             ExpectIdentifier ->
                 case token of
                     (_, Identifier _) ->
-                        let newStep = ExpectOpenParentheses token in
-                        analyse newStep (index + 1)
+                        nextStep $ ExpectOpenParentheses token
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Identifier"
 
             (ExpectOpenParentheses t) ->
                 case token of
                     (_, OpenParentheses) ->
-                        let newStep = ExpectArgOrCloseParentheses t [] in
-                        analyse newStep (index + 1)
+                        nextStep $ ExpectArgOrCloseParentheses t
 
                     _ ->
                         Right (index - 1, VarReference t)
 
-            (ExpectArgOrCloseParentheses t determined) ->
+            (ExpectArgOrCloseParentheses t) ->
                 case token of
                     (_, CloseParentheses) ->
-                        Right (index, FunctionCall t determined)
+                        Right (index, FunctionCall t args)
 
                     _ ->
                         case expressionAnalyse source tokens index of
                             Right (newIndex, expr) ->
-                                let args = determined ++ [expr]
-                                    newStep = ExpectCommaOrCloseParentheses t args in
-                                analyse newStep newIndex
+                                determine expr (ExpectCommaOrCloseParentheses t) newIndex
+
                             Left err ->
                                 Left err
 
-            (ExpectArgument t determined) ->
+            (ExpectArgument t) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
-                        let args = determined ++ [expr]
-                            newStep = ExpectCommaOrCloseParentheses t args in
-                        analyse newStep newIndex
+                        determine expr (ExpectCommaOrCloseParentheses t) newIndex
+
                     Left err ->
                         Left err
 
-            (ExpectCommaOrCloseParentheses t determined) ->
+            (ExpectCommaOrCloseParentheses t) ->
                 case token of
                     (_, Comma) ->
-                        let newStep = ExpectArgument t determined in
-                        analyse newStep (index + 1)
+                        nextStep $ ExpectArgument t
 
                     (_, CloseParentheses) ->
-                        Right (index, FunctionCall t determined)
+                        Right (index, FunctionCall t args)
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "',' or ')'"
 
         where
         token = tokens !! index
 
-        contextualUnexpectedTokenHalt :: Either ExpressionAnalyserError (Int, Expression)
-        contextualUnexpectedTokenHalt =
-            Left $ uncurry (UnexpectedToken source) token expectation
-            where
-            expectation =
-                case step of
-                    ExpectIdentifier ->
-                        "Identifier"
-                    (ExpectOpenParentheses _) ->
-                        "'('"
-                    (ExpectArgOrCloseParentheses _ _) ->
-                        "Expression or ')'"
-                    (ExpectArgument _ _) ->
-                        "Expression"
-                    (ExpectCommaOrCloseParentheses _ _) ->
-                        "',' or ')'"
+        nextStep' newStep = analyse newStep args
+        nextStep newStep = nextStep' newStep (index + 1)
+        determine newArg newStep = analyse newStep (args ++ [newArg])
+        unexpectedTokenHalt e = Left $ uncurry (UnexpectedToken source) token e

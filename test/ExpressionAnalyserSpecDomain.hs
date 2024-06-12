@@ -218,7 +218,7 @@ expect15 = Left $
         source15
         4
         CloseParentheses
-        "Expression"
+        "'(', Identifier or Number"
 
 source16 :: String
 source16 = "!a;"
