@@ -40,7 +40,25 @@ data Token = OpenBrace
            | Keyword String
            | Identifier String
            | Number String
-           deriving (Show, Eq)
+           deriving Eq
+
+instance Show Token where
+    show OpenBrace        = "'{'"
+    show CloseBrace       = "'}'"
+    show OpenParentheses  = "'('"
+    show CloseParentheses = "')'"
+    show Comma            = "','"
+    show Semicolon        = "';'"
+    show Equality         = "'=='"
+    show NotEquality      = "'!='"
+    show MoreOrEq         = "'>='"
+    show LessOrEq         = "'<='"
+    show AndAnd           = "'&&'"
+    show BarBar           = "'||'"
+    show (Symbol a)       = "Symbol '" ++ [a] ++ "'"
+    show (Keyword a)      = "Keyword '" ++ a ++ "'"
+    show (Identifier a)   = "Identifier '" ++ a ++ "'"
+    show (Number a)       = "Number '" ++ a ++ "'" 
 
 data State = State
     { _determined :: [(Int, Token)]
