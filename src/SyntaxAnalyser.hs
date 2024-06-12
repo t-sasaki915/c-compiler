@@ -1,8 +1,8 @@
 module SyntaxAnalyser
-  ( SyntaxAnalyserError(..)
-  , Syntax(..)
-  , syntaxAnalyse
-  ) where
+    ( SyntaxAnalyserError(..)
+    , Syntax(..)
+    , syntaxAnalyse
+    ) where
 
 import ExpressionAnalyser (Expression(..), ExpressionAnalyserError, expressionAnalyse)
 import SourceFileAnalyser (sourceLoc)
@@ -71,7 +71,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectVarOrFunLabel token
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Type"
 
             (ExpectVarOrFunLabel t)->
                 case token of
@@ -79,7 +79,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectEqualOrOpenParenthesesOrSemicolon t token
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Identifier"
 
             (ExpectEqualOrOpenParenthesesOrSemicolon t l) ->
                 case token of
@@ -93,7 +93,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectGlobalVariableDefaultValue t l
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';', '(' or '='"
 
             (ExpectGlobalVariableDefaultValue t l) ->
                 case expressionAnalyse source tokens index of
@@ -109,7 +109,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         determine $ VarDefinition t l (Just d)
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             (ExpectFunArgTypeOrEnd t l) ->
                 case token of
@@ -123,7 +123,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectFunOpenBrace t l []
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Type or ')'"
 
             (ExpectFunArgEnd t l) ->
                 case token of
@@ -131,7 +131,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectFunOpenBrace t l []
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "')'"
 
             (ExpectFunArgType t l determined) ->
                 case token of
@@ -139,7 +139,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectFunArgLabel t l token determined
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Type"
 
             (ExpectFunArgLabel t l at determined) ->
                 case token of
@@ -147,7 +147,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectFunArgCommaOrEnd t l at token determined
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Identifier"
 
             (ExpectFunArgCommaOrEnd t l at al determined) ->
                 case token of
@@ -160,7 +160,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         nextStep $ ExpectFunOpenBrace t l (determined ++ [newArg])
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "',' or ')'"
 
             (ExpectFunOpenBrace t l args) ->
                 case token of
@@ -173,7 +173,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                                 Left err
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'{'"
 
             (ExpectFunCloseBrace t l args contents) ->
                 case token of
@@ -181,7 +181,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         determine $ FunDefinition t l args contents
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'}'"
         where
         token = tokens !! index
 
@@ -194,36 +194,9 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
         determine :: Syntax -> Either SyntaxAnalyserError Syntax
         determine newSyntax = determine' newSyntax (index + 1)
 
-        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError Syntax
-        contextualUnexpectedTokenHalt =
+        unexpectedTokenHalt :: String -> Either SyntaxAnalyserError Syntax
+        unexpectedTokenHalt expectation =
             Left $ uncurry (UnexpectedToken source) token expectation
-            where
-            expectation =
-                case step of
-                    ExpectVarOrFunType ->
-                        "Type"
-                    (ExpectVarOrFunLabel {}) ->
-                        "Identifier"
-                    (ExpectEqualOrOpenParenthesesOrSemicolon {}) ->
-                        "'=', '(' or ';'"
-                    (ExpectGlobalVariableDefaultValue {}) ->
-                        "Expression"
-                    (ExpectGlobalVariableSemicolon {}) ->
-                        "';'"
-                    (ExpectFunArgTypeOrEnd {}) ->
-                        "Type or ')'"
-                    (ExpectFunArgEnd {}) ->
-                        "')'"
-                    (ExpectFunArgType {}) ->
-                        "Type"
-                    (ExpectFunArgLabel {}) ->
-                        "Identifier"
-                    (ExpectFunArgCommaOrEnd {}) ->
-                        "',' or ')'"
-                    (ExpectFunOpenBrace {}) ->
-                        "'{'"
-                    (ExpectFunCloseBrace {}) ->
-                        "'}'"
 
 data FAnalyseStep = ExpectFirstFactor
                   | ExpectReturnExpression
@@ -293,7 +266,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         Right (index, contents)
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Keyword, Identifier or '}'"
 
             ExpectReturnExpression ->
                 case token of
@@ -314,7 +287,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ Return e
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             (ExpectLocalVariableLabel t) ->
                 case token of
@@ -322,7 +295,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep $ ExpectLocalVariableEqualOrSemicolon t token
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "Identifier"
 
             (ExpectLocalVariableEqualOrSemicolon t l) ->
                 case token of
@@ -333,7 +306,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ VarDefinition t l Nothing
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'=' or ';'"
 
             (ExpectLocalVariableExpression t l) ->
                 case expressionAnalyse source tokens index of
@@ -349,7 +322,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ VarDefinition t l (Just e)
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             (ExpectEqualOrOpenParentheses l) ->
                 case token of
@@ -366,7 +339,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                                 Left err
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'=' or '('"
 
             (ExpectExpressionToReassignVariable l) ->
                 case expressionAnalyse source tokens index of
@@ -382,7 +355,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ VarReassign l e
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             (ExpectFunctionCallSemicolon l args) ->
                 case token of
@@ -390,7 +363,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ FunctionCallSyntax l args
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             ExpectWhileOpenParentheses ->
                 case token of
@@ -398,7 +371,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep ExpectWhileCondition
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'('"
 
             ExpectWhileCondition ->
                 case expressionAnalyse source tokens index of
@@ -414,7 +387,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep $ ExpectWhileOpenBraceOrSyntax cond
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "')'"
 
             (ExpectWhileOpenBraceOrSyntax cond) ->
                 case token of
@@ -439,7 +412,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ While cond inner
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'}'"
 
             ExpectContinueSemicolon ->
                 case token of
@@ -447,7 +420,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine Continue
                     
                     _ -> 
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
 
             ExpectBreakSemicolon ->
                 case token of
@@ -455,7 +428,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine Break
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "';'"
             
             ExpectIfOpenParentheses ->
                 case token of
@@ -463,7 +436,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep ExpectIfCondition
                     
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'('"
 
             ExpectIfCondition ->
                 case expressionAnalyse source tokens index of
@@ -479,7 +452,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep $ ExpectIfOpenBraceOrSyntax cond
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "')'"
 
             (ExpectIfOpenBraceOrSyntax cond) ->
                 case token of
@@ -505,7 +478,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         nextStep $ ExpectElseOrEnd cond inner
                     
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'}'"
 
             (ExpectElseOrEnd cond inner) ->
                 case token of
@@ -540,7 +513,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                         determine $ If cond inner elseInner
 
                     _ ->
-                        contextualUnexpectedTokenHalt
+                        unexpectedTokenHalt "'}'"
 
         where
         token = tokens !! index
@@ -554,64 +527,9 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
         determine :: Syntax -> Either SyntaxAnalyserError (Int, [Syntax])
         determine newContent = determine' newContent (index + 1)
 
-        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError (Int, [Syntax])
-        contextualUnexpectedTokenHalt =
+        unexpectedTokenHalt :: String -> Either SyntaxAnalyserError (Int, [Syntax])
+        unexpectedTokenHalt expectation =
             Left $ uncurry (UnexpectedToken source) token expectation
-            where
-            expectation =
-                case step of
-                    ExpectFirstFactor ->
-                        "Keyword, Identifier or '}'"
-                    ExpectReturnExpression ->
-                        "Expression or ';'"
-                    (ExpectReturnSemicolon _) ->
-                        "';'"
-                    (ExpectLocalVariableLabel _) ->
-                        "Identifier"
-                    (ExpectLocalVariableEqualOrSemicolon {}) ->
-                        "'=' or ';'"
-                    (ExpectLocalVariableExpression {}) ->
-                        "Expression"
-                    (ExpectLocalVariableSemicolon {}) ->
-                        "';'"
-                    (ExpectEqualOrOpenParentheses _) ->
-                        "'=' or '('"
-                    (ExpectExpressionToReassignVariable _) ->
-                        "Expression"
-                    (ExpectReassignSemicolon {}) ->
-                        "';'"
-                    (ExpectFunctionCallSemicolon {}) ->
-                        "';'"
-                    ExpectWhileOpenParentheses ->
-                        "'('"
-                    ExpectWhileCondition ->
-                        "Expression"
-                    (ExpectWhileCloseParentheses _) ->
-                        "')'"
-                    (ExpectWhileOpenBraceOrSyntax _) ->
-                        "'{' or Body"
-                    (ExpectWhileCloseBrace _ _) ->
-                        "'}'"
-                    ExpectContinueSemicolon ->
-                        "';'"
-                    ExpectBreakSemicolon ->
-                        "';'"
-                    ExpectIfOpenParentheses ->
-                        "'('"
-                    ExpectIfCondition ->
-                        "Expression"
-                    (ExpectIfCloseParentheses _) ->
-                        "')'"
-                    (ExpectIfOpenBraceOrSyntax _) ->
-                        "'{' or Body"
-                    (ExpectIfCloseBrace _ _) ->
-                        "'}'"
-                    (ExpectElseOrEnd _ _) ->
-                        "'else' or Body"
-                    (ExpectElseOpenBraceOrSyntax _ _) ->
-                        "'{' or Body"
-                    (ExpectElseCloseBrace {}) ->
-                        "'}'"
 
 data AAnalyseStep = ExpectArgumentOrEnd
                   | ExpectCommaOrEnd
@@ -637,6 +555,7 @@ functionArgAnalyse source tokens = analyse ExpectArgumentOrEnd []
                         case expressionAnalyse source tokens index of
                             Right (newIndex, expr) ->
                                 analyse ExpectCommaOrEnd [expr] newIndex
+
                             Left err ->
                                 Left $ InvalidExpression err
 
@@ -648,28 +567,16 @@ functionArgAnalyse source tokens = analyse ExpectArgumentOrEnd []
                     (_, Comma) ->
                         analyse ExpectArgument args (index + 1)
 
-                    _ ->
-                        contextualUnexpectedTokenHalt
+                    (a, b) ->
+                        Left $ UnexpectedToken source a b "',' or ')'"
 
             ExpectArgument ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
                         analyse ExpectCommaOrEnd (args ++ [expr]) newIndex
+
                     Left err ->
                         Left $ InvalidExpression err
 
         where
         token = tokens !! index
-
-        contextualUnexpectedTokenHalt :: Either SyntaxAnalyserError (Int, [Expression])
-        contextualUnexpectedTokenHalt =
-            Left $ uncurry (UnexpectedToken source) token expectation
-            where
-            expectation =
-                case step of
-                    ExpectArgumentOrEnd ->
-                        "Expression or ')'"
-                    ExpectCommaOrEnd ->
-                        "',' or ')'"
-                    ExpectArgument ->
-                        "Expression"
