@@ -31,6 +31,8 @@ data Token = OpenBrace
            | NotEquality
            | MoreOrEq
            | LessOrEq
+           | AndAnd
+           | BarBar
            | Symbol Char
            | Keyword String
            | Identifier String
@@ -120,6 +122,18 @@ tokenise source = analyse (State [] "" False False False) 0
                                stopBufferingWith2 [(index + 1, LessOrEq)]
                            _ ->
                                stopBufferingWith [(index, Symbol chara)]
+                   | chara == '&' ->
+                       case source !? (index + 1) of
+                           Just '&' ->
+                               stopBufferingWith2 [(index + 1, AndAnd)]
+                           _ ->
+                               stopBufferingWith [(index, Symbol chara)]
+                   | chara == '|' ->
+                       case source !? (index + 1) of
+                           Just '|' ->
+                               stopBufferingWith2 [(index + 1, BarBar)]
+                           _ ->
+                               stopBufferingWith [(index, Symbol chara)]
                    | chara `elem` acceptableSymbols ->
                        stopBufferingWith [(index, Symbol chara)]
                    | chara `elem` (acceptableAlphabets ++ acceptableNumbers) ->
@@ -165,6 +179,18 @@ tokenise source = analyse (State [] "" False False False) 0
                        case source !? (index + 1) of
                            Just '=' ->
                                analyseNextCharWith2 [(index + 1, LessOrEq)]
+                           _ ->
+                               analyseNextCharWith [(index, Symbol chara)]
+                   | chara == '&' ->
+                       case source !? (index + 1) of
+                           Just '&' ->
+                               analyseNextCharWith2 [(index + 1, AndAnd)]
+                           _ ->
+                               analyseNextCharWith [(index, Symbol chara)]
+                   | chara == '|' ->
+                       case source !? (index + 1) of
+                           Just '|' ->
+                               analyseNextCharWith2 [(index + 1, BarBar)]
                            _ ->
                                analyseNextCharWith [(index, Symbol chara)]
                    | chara `elem` acceptableSymbols ->

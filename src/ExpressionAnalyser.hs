@@ -31,11 +31,15 @@ data Expression = VarReference (Int, Token)
                 | MoreThanOrEq Expression Expression
                 | LessThanOrEq Expression Expression
                 | Opposition Expression
+                | Negative Expression
+                | And Expression Expression
+                | Or Expression Expression
                 | Void
                 deriving (Show, Eq)
 
 data AnalyserStep = ExpectOpenParenthesesOrIdentifierOrNumber
-                  | ExpectExpressionToReverse
+                  | ExpectExpressionToDoSingleExprCalculation
+                        (Expression -> Expression)
                   | ExpectCalcSymbolOrEnd Expression
                   | ExpectExpressionToDoBasicCalculation
                         (Expression -> Expression -> Expression)
@@ -76,39 +80,16 @@ expressionAnalyse source tokens =
                         analyse newStep (index + 1)
 
                     (_, Symbol '!') ->
-                        let newStep = ExpectExpressionToReverse in
-                        analyse newStep (index + 1)
+                        scheduleSingleExprCalculation Opposition
+
+                    (_, Symbol '-') ->
+                        scheduleSingleExprCalculation Negative
 
                     _ ->
                         contextualUnexpectedTokenHalt
 
-            ExpectExpressionToReverse ->
-                case token of
-                    (_, OpenParentheses) ->
-                        case expressionAnalyse source tokens (index + 1) of
-                            Right (newIndex, expr) ->
-                                let newExpr = Opposition expr
-                                    newStep = ExpectCalcSymbolOrEnd newExpr in
-                                analyse newStep (newIndex + 1)
-                            Left err ->
-                                Left err
-
-                    (_, Identifier _) ->
-                        case functionCallAnalyse source tokens index of
-                            Right (newIndex, expr) ->
-                                let newExpr = Opposition expr
-                                    newStep = ExpectCalcSymbolOrEnd newExpr in
-                                analyse newStep (newIndex + 1)
-                            Left err ->
-                                Left err
-
-                    (_, Number _) ->
-                        let expr = Opposition $ NumReference token
-                            newStep = ExpectCalcSymbolOrEnd expr in
-                        analyse newStep (index + 1)
-
-                    _ ->
-                        contextualUnexpectedTokenHalt
+            (ExpectExpressionToDoSingleExprCalculation f) ->
+                singleExprCalculation f
 
             (ExpectCalcSymbolOrEnd e) ->
                 case token of
@@ -132,6 +113,12 @@ expressionAnalyse source tokens =
 
                     (_, LessOrEq) ->
                         scheduleBasicCalculation LessThanOrEq e
+
+                    (_, AndAnd) ->
+                        scheduleBasicCalculation And e
+
+                    (_, BarBar) ->
+                        scheduleBasicCalculation Or e
 
                     (_, Symbol '+') ->
                         scheduleBasicCalculation Addition e
@@ -166,6 +153,12 @@ expressionAnalyse source tokens =
             let newStep = ExpectExpressionToDoBasicCalculation f e in
             analyse newStep (index + 1)
 
+        scheduleSingleExprCalculation :: (Expression -> Expression) ->
+                                         Either ExpressionAnalyserError (Int, Expression)
+        scheduleSingleExprCalculation f =
+            let newStep = ExpectExpressionToDoSingleExprCalculation f in
+            analyse newStep (index + 1)
+
         basicCalculation :: (Expression -> Expression -> Expression) ->
                             Expression -> Either ExpressionAnalyserError (Int, Expression)
         basicCalculation f e =
@@ -196,6 +189,36 @@ expressionAnalyse source tokens =
                 _ ->
                     contextualUnexpectedTokenHalt
 
+        singleExprCalculation :: (Expression -> Expression) ->
+                                 Either ExpressionAnalyserError (Int, Expression)
+        singleExprCalculation f =
+            case token of
+                (_, OpenParentheses) ->
+                    case expressionAnalyse source tokens (index + 1) of
+                        Right (newIndex, expr) ->
+                            let newExpr = f expr
+                                newStep = ExpectCalcSymbolOrEnd newExpr in
+                            analyse newStep (newIndex + 1)
+                        Left err ->
+                            Left err
+
+                (_, Identifier _) ->
+                    case functionCallAnalyse source tokens index of
+                        Right (newIndex, expr) ->
+                            let newExpr = f expr
+                                newStep = ExpectCalcSymbolOrEnd newExpr in
+                            analyse newStep (newIndex + 1)
+                        Left err ->
+                            Left err
+                    
+                (_, Number _) ->
+                    let newExpr = f (NumReference token)
+                        newStep = ExpectCalcSymbolOrEnd newExpr in
+                    analyse newStep (index + 1)
+
+                _ ->
+                    contextualUnexpectedTokenHalt
+
         contextualUnexpectedTokenHalt :: Either ExpressionAnalyserError (Int, Expression)
         contextualUnexpectedTokenHalt =
             Left $ uncurry (UnexpectedToken source) token expectation
@@ -204,7 +227,7 @@ expressionAnalyse source tokens =
                 case step of
                     ExpectOpenParenthesesOrIdentifierOrNumber ->
                         "'(', Identifier or Number"
-                    ExpectExpressionToReverse ->
+                    (ExpectExpressionToDoSingleExprCalculation _) ->
                         "Expression"
                     (ExpectCalcSymbolOrEnd _) ->
                         "Calculation Symbol, ')', ',' or ';'"

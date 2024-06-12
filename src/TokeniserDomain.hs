@@ -18,7 +18,8 @@ acceptableReturns =
 
 acceptableSymbols :: [Char]
 acceptableSymbols =
-    [ '+', '-', '*', '/', '=', '<', '>', '!' ]
+    [ '+', '-', '*', '/', '=', '<', '>', '!', '&', '|'
+    ]
 
 acceptableAlphabets :: [Char]
 acceptableAlphabets =
