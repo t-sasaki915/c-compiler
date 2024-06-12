@@ -18,8 +18,8 @@ compile sourceFileName = do
             case tokenise cSource of
                 Right tokens ->
                     case syntaxAnalyse cSource tokens of
-                        Right tree -> do
-                            print tree
+                        Right structure -> do
+                            print structure
                             return $ Right ()
 
                         Left sErr ->

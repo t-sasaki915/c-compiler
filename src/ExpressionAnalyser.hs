@@ -4,18 +4,21 @@ module ExpressionAnalyser
     , expressionAnalyse
     ) where
 
-import SourceFileAnalyser (sourceLoc)
+import ErrorHandling
 import Tokeniser (Token(..))
 
 data ExpressionAnalyserError = UnexpectedToken String Int Token String
                              | UnexpectedEOF String Int
-                             deriving Eq
+                             deriving (Eq, Show)
 
-instance Show ExpressionAnalyserError where
-    show (UnexpectedToken src ind t e) =
-        "(" ++ sourceLoc src ind ++ ") Expected " ++ e ++ " but " ++ show t ++ " found."
-    show (UnexpectedEOF src ind) =
-        "(" ++ sourceLoc src ind ++ ") Unexpected end of file."
+instance TrackableError ExpressionAnalyserError where
+    place (UnexpectedToken a b _ _) = (a, b)
+    place (UnexpectedEOF a b)       = (a, b)
+    title (UnexpectedToken {})      = "Unexpected Token"
+    title (UnexpectedEOF {})        = "Unexpected end of file"
+    cause (UnexpectedToken _ _ a b) =
+        "Expected " ++ b ++ " but " ++ show a ++ " has found."
+    cause (UnexpectedEOF _ _)       = ""
 
 data Expression = VarReference (Int, Token)
                 | NumReference (Int, Token)

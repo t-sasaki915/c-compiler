@@ -2,8 +2,8 @@
 
 module Tokeniser (TokeniserError(..), Token(..), tokenise) where
 
+import ErrorHandling
 import ListExtra ((!?))
-import SourceFileAnalyser (sourceLoc)
 import TokeniserDomain
 
 import Control.Lens hiding (index)
@@ -11,15 +11,18 @@ import Control.Lens hiding (index)
 data TokeniserError = UnexpectedCharacter String Int Char
                     | InvalidNumberFormat String Int String
                     | InvalidToken String Int String
-                    deriving Eq
+                    deriving (Eq, Show)
 
-instance Show TokeniserError where
-    show (UnexpectedCharacter src ind chara) =
-        "(" ++ sourceLoc src ind ++ ") Unexpected character: " ++ [chara]
-    show (InvalidNumberFormat src ind token) =
-        "(" ++ sourceLoc src ind ++ ") Invalid number format: " ++ token
-    show (InvalidToken src ind token) =
-        "(" ++ sourceLoc src ind ++ ") Invalid token: " ++ token
+instance TrackableError TokeniserError where
+    place (UnexpectedCharacter a b _) = (a, b)
+    place (InvalidNumberFormat a b _) = (a, b)
+    place (InvalidToken a b _)        = (a, b)
+    title (UnexpectedCharacter {})    = "Unexpected character"
+    title (InvalidNumberFormat {})    = "Invalid number format"
+    title (InvalidToken {})           = "Invalid token"
+    cause (UnexpectedCharacter _ _ a) = [a]
+    cause (InvalidNumberFormat _ _ a) = a
+    cause (InvalidToken _ _ a)        = a
 
 data Token = OpenBrace
            | CloseBrace

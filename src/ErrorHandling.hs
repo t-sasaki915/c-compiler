@@ -1,8 +1,4 @@
-module SourceFileAnalyser
-    ( getLineNumber
-    , getIndexOfLine
-    , sourceLoc
-    ) where
+module ErrorHandling (TrackableError(..)) where
 
 import Data.List (findIndices)
 
@@ -29,8 +25,16 @@ getIndexOfLine source index =
     where
     targetPart = take (index + 1) source
 
-sourceLoc :: String -> Int -> String
-sourceLoc source index = "Line " ++ show line ++ ", Index " ++ show index'
-    where
-    line = getLineNumber source index
-    index' = getIndexOfLine source index
+class TrackableError a where
+    place :: a -> (String, Int)
+    title :: a -> String
+    cause :: a -> String
+
+    trace :: a -> String
+    trace a = "(Line " ++ line ++ ", Index " ++ index ++ ") " ++
+        case cause a of
+            "" -> title a
+            c  -> title a ++ ": " ++ c
+        where
+        line = show $ uncurry getLineNumber (place a)
+        index = show $ uncurry getIndexOfLine (place a)

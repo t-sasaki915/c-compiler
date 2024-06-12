@@ -28,9 +28,9 @@ library
       CommandLineInterface
       CommandLineParser
       Compiler
+      ErrorHandling
       ExpressionAnalyser
       ListExtra
-      SourceFileAnalyser
       SyntaxAnalyser
       Tokeniser
       TokeniserDomain

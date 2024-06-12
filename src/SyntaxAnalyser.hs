@@ -4,23 +4,27 @@ module SyntaxAnalyser
     , syntaxAnalyse
     ) where
 
+import ErrorHandling
 import ExpressionAnalyser (Expression(..), ExpressionAnalyserError, expressionAnalyse)
-import SourceFileAnalyser (sourceLoc)
 import Tokeniser (Token(..))
 import TokeniserDomain (typeKeywords)
 
 data SyntaxAnalyserError = UnexpectedToken String Int Token String
                          | UnexpectedEOF String Int
                          | InvalidExpression ExpressionAnalyserError
-                         deriving Eq
+                         deriving (Eq, Show)
 
-instance Show SyntaxAnalyserError where
-    show (UnexpectedToken src ind t e) =
-        "(" ++ sourceLoc src ind ++ ") Expected " ++ e ++ " but " ++ show t ++ " found."
-    show (UnexpectedEOF src ind) =
-        "(" ++ sourceLoc src ind ++ ") Unexpected end of file."
-    show (InvalidExpression e) =
-        show e
+instance TrackableError SyntaxAnalyserError where
+    place (UnexpectedToken a b _ _) = (a, b)
+    place (UnexpectedEOF a b)       = (a, b)
+    place (InvalidExpression a)     = place a
+    title (UnexpectedToken {})      = "Unexpected token"
+    title (UnexpectedEOF {})        = "Unexpected end of file"
+    title (InvalidExpression a)     = title a
+    cause (UnexpectedToken _ _ a b) =
+        "Expected " ++ b ++ " but " ++ show a ++ " has found."
+    cause (UnexpectedEOF {})        = ""
+    cause (InvalidExpression a)     = cause a
 
 data Syntax = Program [Syntax]
             | Definitions [Syntax]

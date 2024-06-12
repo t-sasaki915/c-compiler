@@ -5,6 +5,7 @@ module CommandLineInterface (startProgram) where
 import CommandLine (CmdOption(..), cmdOptions)
 import CommandLineParser (ParsedArgument(..))
 import Compiler (CompilerError(..), compile)
+import ErrorHandling (TrackableError(trace))
 
 import Control.Lens hiding (index)
 import System.Environment (getProgName)
@@ -60,12 +61,12 @@ startProgram args =
 
                 Left (TokeniserFailure tokeniserErr) -> do
                     putStrLn "The tokenisation process has aborted!!"
-                    print tokeniserErr
+                    putStrLn $ trace tokeniserErr
                     return (ExitFailure 1)
 
                 Left (SyntaxAnalyserFailure syntaxAnalyserErr) -> do
                     putStrLn "The syntax analysation process has aborted!!"
-                    print syntaxAnalyserErr
+                    putStrLn $ trace syntaxAnalyserErr
                     return (ExitFailure 1)
 
         Left (UnknownOption str) -> do
