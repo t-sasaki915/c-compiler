@@ -50,4 +50,5 @@ main = do
         , TestLabel "Function with Arguments Analysation"       syntaxAnalyserTest4
         , TestLabel "Return Syntax Analysation"                 syntaxAnalyserTest5
         , TestLabel "No Expression Return Analysation"          syntaxAnalyserTest6
+        , TestLabel "Local Variable Analysation"                syntaxAnalyserTest7
         ]

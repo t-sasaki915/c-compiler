@@ -254,6 +254,10 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
 data FAnalyseStep = ExpectFirstFactor
                   | ExpectReturnExpression
                   | ExpectReturnSemicolon Expr
+                  | ExpectLocalVariableLabel IToken
+                  | ExpectLocalVariableEqualOrSemicolon IToken IToken
+                  | ExpectLocalVariableExpression IToken IToken
+                  | ExpectLocalVariableSemicolon IToken IToken Expr
 
 functionAnalyse :: String -> [(Int, Token)] -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
@@ -270,6 +274,10 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                 case token of
                     (_, Keyword "return") ->
                         let newStep = ExpectReturnExpression in
+                        analyse newStep contents (index + 1)
+
+                    (_, Keyword k) | k `elem` typeKeywords ->
+                        let newStep = ExpectLocalVariableLabel token in
                         analyse newStep contents (index + 1)
 
                     (_, CloseBrace) ->
@@ -306,6 +314,49 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     _ ->
                         contextualUnexpectedTokenHalt
 
+            (ExpectLocalVariableLabel t) ->
+                case token of
+                    (_, Identifier _) ->
+                        let newStep = ExpectLocalVariableEqualOrSemicolon t token in
+                        analyse newStep contents (index + 1)
+                    
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectLocalVariableEqualOrSemicolon t l) ->
+                case token of
+                    (_, Symbol '=') ->
+                        let newStep = ExpectLocalVariableExpression t l in
+                        analyse newStep contents (index + 1)
+                    
+                    (_, Semicolon) ->
+                        let newVariable = VarDefinition t l Nothing
+                            newContents = contents ++ [newVariable]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+                
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
+            (ExpectLocalVariableExpression t l) ->
+                case expressionAnalyse source tokens index of
+                    Right (newIndex, expr) ->
+                        let newStep = ExpectLocalVariableSemicolon t l expr in
+                        analyse newStep contents newIndex
+                    Left err ->
+                        Left $ InvalidExpression err
+
+            (ExpectLocalVariableSemicolon t l e) ->
+                case token of
+                    (_, Semicolon) ->
+                        let newVariable = VarDefinition t l (Just e)
+                            newContents = contents ++ [newVariable]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        contextualUnexpectedTokenHalt
+
         where
         token = tokens !! index
 
@@ -320,4 +371,12 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     ExpectReturnExpression ->
                         "Expression or ';'"
                     (ExpectReturnSemicolon _) ->
+                        "';'"
+                    (ExpectLocalVariableLabel _) ->
+                        "Identifier"
+                    (ExpectLocalVariableEqualOrSemicolon {}) ->
+                        "'=' or ';'"
+                    (ExpectLocalVariableExpression {}) ->
+                        "Expression"
+                    (ExpectLocalVariableSemicolon {}) ->
                         "';'"
