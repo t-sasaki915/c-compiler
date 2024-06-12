@@ -4,6 +4,7 @@ module SyntaxAnalyserSpec
     , syntaxAnalyserTest3
     , syntaxAnalyserTest4
     , syntaxAnalyserTest5
+    , syntaxAnalyserTest6
     ) where
 
 import SyntaxAnalyser
@@ -35,3 +36,6 @@ syntaxAnalyserTest4 = syntaxAnalyserTest source4 expect4
 
 syntaxAnalyserTest5 :: Test
 syntaxAnalyserTest5 = syntaxAnalyserTest source5 expect5
+
+syntaxAnalyserTest6 :: Test
+syntaxAnalyserTest6 = syntaxAnalyserTest source6 expect6

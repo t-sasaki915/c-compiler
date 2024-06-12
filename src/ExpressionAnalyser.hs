@@ -31,6 +31,7 @@ data Expression = VarReference (Int, Token)
                 | MoreThanOrEq Expression Expression
                 | LessThanOrEq Expression Expression
                 | Opposition Expression
+                | Void
                 deriving (Show, Eq)
 
 data AnalyserStep = ExpectOpenParenthesesOrIdentifierOrNumber

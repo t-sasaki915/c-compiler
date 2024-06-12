@@ -279,13 +279,21 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                         contextualUnexpectedTokenHalt
 
             ExpectReturnExpression ->
-                case expressionAnalyse source tokens index of
-                    Right (newIndex, expr) ->
-                        let newStep = ExpectReturnSemicolon expr in
-                        analyse newStep contents newIndex
+                case token of
+                    (_, Semicolon) ->
+                        let newReturn = Return Void
+                            newContents = contents ++ [newReturn]
+                            newStep = ExpectFirstFactor in
+                        analyse newStep newContents (index + 1)
+
+                    _ ->
+                        case expressionAnalyse source tokens index of
+                            Right (newIndex, expr) ->
+                                let newStep = ExpectReturnSemicolon expr in
+                                analyse newStep contents newIndex
                     
-                    Left err ->
-                        Left $ InvalidExpression err
+                            Left err ->
+                                Left $ InvalidExpression err
 
             (ExpectReturnSemicolon e) ->
                 case token of
@@ -310,6 +318,6 @@ functionAnalyse source tokens = analyse ExpectFirstFactor []
                     ExpectFirstFactor ->
                         "Keyword, Identifier or '}'"
                     ExpectReturnExpression ->
-                        "Expression"
+                        "Expression or ';'"
                     (ExpectReturnSemicolon _) ->
                         "';'"

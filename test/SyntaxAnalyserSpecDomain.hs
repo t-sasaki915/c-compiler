@@ -10,6 +10,8 @@ module SyntaxAnalyserSpecDomain
     , expect4
     , source5
     , expect5
+    , source6
+    , expect6
     ) where
 
 import SyntaxAnalyser
@@ -157,6 +159,27 @@ expect5 = Right $
                         (VarReference (68, Identifier "a"))
                         (VarReference (72, Identifier "b"))
                     )
+                ]
+            ) []
+        ]
+
+source6 :: String
+source6 = unlines
+    [ "void doNothing()"
+    , "{"
+    , "    return;"
+    , "}"
+    ]
+
+expect6 :: Result
+expect6 = Right $
+    SyntaxTree Program
+        [ SyntaxTree
+            ( FunDefinition
+                (3, Keyword "void")
+                (13, Identifier "doNothing")
+                []
+                [ Return Void
                 ]
             ) []
         ]
