@@ -68,4 +68,10 @@ main = do
         , TestLabel "Existence of The Entrypoint Verification #2" semanticVerifyTest2
         , TestLabel "Existence of The Entrypoint Verficiation #3" semanticVerifyTest3
         , TestLabel "Existence of The Entrypoint Verification #4" semanticVerifyTest4
+        , TestLabel "Identifier Confliction Verification #1"      semanticVerifyTest5
+        , TestLabel "Identifier Confliction Verification #2"      semanticVerifyTest6
+        , TestLabel "Identifier Confliction Verification #3"      semanticVerifyTest7
+        , TestLabel "Identifier Confliction Verification #4"      semanticVerifyTest8
+        , TestLabel "Identifier Confliction Verification #5"      semanticVerifyTest9
+        , TestLabel "Identifier Confliction Verification #6"      semanticVerifyTest10
         ]
