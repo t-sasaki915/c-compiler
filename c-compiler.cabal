@@ -31,6 +31,7 @@ library
       ErrorHandling
       ExpressionAnalyser
       ListExtra
+      SemanticVerifier
       SyntaxAnalyser
       Tokeniser
       TokeniserDomain

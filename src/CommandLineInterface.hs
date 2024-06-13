@@ -69,6 +69,11 @@ startProgram args =
                     putStrLn $ trace syntaxAnalyserErr
                     return (ExitFailure 1)
 
+                Left (SemanticVerifierFailure semanticErr) -> do
+                    putStrLn "The semantic verification process has aborted!!"
+                    putStrLn $ trace semanticErr
+                    return (ExitFailure 1)
+
         Left (UnknownOption str) -> do
             putStrLn $ "There was an unrecognisable option reference: " ++ str
             printUsage
