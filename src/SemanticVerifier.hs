@@ -37,9 +37,6 @@ instance TrackableError SemanticError where
         a ++ " cannot be a type of variables."
     cause (BrokenProgramStructure _ _)    = ""
 
-(&&&) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
-(&&&) f1 f2 a = f1 a && f2 a
-
 semanticVerify :: String -> Syntax -> Either SemanticError ()
 semanticVerify =
     mainDetection `andThen`
@@ -65,54 +62,45 @@ mainDetection source (Program[Definitions defs]) =
     isArgEmpty (FunDefinition _ _ [] _) = True
     isArgEmpty _ = False
 
+    (&&&) f1 f2 a = f1 a && f2 a
+
 mainDetection source _ = Left $ BrokenProgramStructure source 0
 
 conflictionCheck :: String -> Syntax -> Either SemanticError ()
-conflictionCheck source (Program[Definitions defs]) =
-    globally [] 0 >>= const (functionScope 0)
+conflictionCheck source (Program[Definitions defs]) = checkScope defs
     where
-    globally :: [String] -> Int -> Either SemanticError ()
-    globally _ index | index >= length defs = Right ()
-    globally detected index =
-        case defs !! index of
-            (FunDefinition _ (n, Identifier name) _ _) | name `elem` detected ->
-                Left $ IdentifierConfliction source n name
+    checkScope programs = fst $ foldl
+        (\a b ->
+            case a of
+                (Left _, _) -> a
+                (Right (), ids) ->
+                    case b of
+                        (FunDefinition _ (n, Identifier name) _ _) | name `elem` ids ->
+                            (Left $ IdentifierConfliction source n name, [])
+                        
+                        (VarDefinition _ (n, Identifier name) _) | name `elem` ids ->
+                            (Left $ IdentifierConfliction source n name, [])
 
-            (FunDefinition _ (_, Identifier name) _ _) ->
-                globally (detected ++ [name]) (index + 1)
+                        (FunDefinition _ (_, Identifier name) args body) ->
+                            (checkScope (args ++ body), ids ++ [name])
 
-            (VarDefinition _ (n, Identifier name) _) | name `elem` detected ->
-                Left $ IdentifierConfliction source n name
+                        (VarDefinition _ (_, Identifier name) _) ->
+                            (Right (), ids ++ [name])
 
-            (VarDefinition _ (_, Identifier name) _) ->
-                globally (detected ++ [name]) (index + 1)
+                        (While _ body) ->
+                            (checkScope body, ids)
 
-            _ ->
-                Left $ BrokenProgramStructure source 0
+                        (If _ body1 body2) ->
+                            (checkScope body1 >>= const (checkScope body2), ids)
 
-    functionScope :: Int -> Either SemanticError ()
-    functionScope index | index >= length defs = Right ()
-    functionScope index =
-        case defs !! index of
-            (FunDefinition _ _ args body) ->
-                check (args ++ body) [] 0 >>=
-                    const (functionScope (index + 1))
+                        (For _ _ _ body) ->
+                            (checkScope body, ids)
+                        
+                        _ -> a
 
-            _ ->
-                functionScope (index + 1)
-        where
-        check :: [Syntax] -> [String] -> Int -> Either SemanticError ()
-        check defs2 _ index2 | index2 >= length defs2 = Right ()
-        check defs2 detected index2 =
-            case defs2 !! index2 of
-                (VarDefinition _ (n, Identifier name) _) | name `elem` detected ->
-                    Left $ IdentifierConfliction source n name
-
-                (VarDefinition _ (_, Identifier name) _) ->
-                    check defs2 (detected ++ [name]) (index2 + 1)
-
-                _ ->
-                    check defs2 detected (index2 + 1)
+        )
+        (Right (), [])
+        programs
 
 conflictionCheck source _ = Left $ BrokenProgramStructure source 0
 
