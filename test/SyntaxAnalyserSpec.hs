@@ -12,6 +12,11 @@ module SyntaxAnalyserSpec
     , syntaxAnalyserTest11
     , syntaxAnalyserTest12
     , syntaxAnalyserTest13
+    , syntaxAnalyserTest14
+    , syntaxAnalyserTest15
+    , syntaxAnalyserTest16
+    , syntaxAnalyserTest17
+    , syntaxAnalyserTest18
     ) where
 
 import SyntaxAnalyser
@@ -67,3 +72,18 @@ syntaxAnalyserTest12 = syntaxAnalyserTest source12 expect12
 
 syntaxAnalyserTest13 :: Test
 syntaxAnalyserTest13 = syntaxAnalyserTest source13 expect13
+
+syntaxAnalyserTest14 :: Test
+syntaxAnalyserTest14 = syntaxAnalyserTest source14 expect14
+
+syntaxAnalyserTest15 :: Test
+syntaxAnalyserTest15 = syntaxAnalyserTest source15 expect15
+
+syntaxAnalyserTest16 :: Test
+syntaxAnalyserTest16 = syntaxAnalyserTest source16 expect16
+
+syntaxAnalyserTest17 :: Test
+syntaxAnalyserTest17 = syntaxAnalyserTest source17 expect17
+
+syntaxAnalyserTest18 :: Test
+syntaxAnalyserTest18 = syntaxAnalyserTest source18 expect18

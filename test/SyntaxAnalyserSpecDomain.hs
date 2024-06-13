@@ -26,6 +26,16 @@ module SyntaxAnalyserSpecDomain
     , expect12
     , source13
     , expect13
+    , source14
+    , expect14
+    , source15
+    , expect15
+    , source16
+    , expect16
+    , source17
+    , expect17
+    , source18
+    , expect18
     ) where
 
 import SyntaxAnalyser
@@ -425,6 +435,176 @@ expect13 = Right $
                         ]
                         []
                     ]
+                ]
+            ]
+        ]
+
+source14 :: String
+source14 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    a += 1;"
+    , "    b -= c();"
+    , "}"
+    ]
+
+expect14 :: Result
+expect14 = Right $
+    Program
+        [ Definitions
+            [ FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ VarReassign (17, Identifier "a")
+                    ( Addition
+                        (VarReference (17, Identifier "a"))
+                        (NumReference (22, Number "1"))
+                    )
+                , VarReassign (29, Identifier "b")
+                    ( Subtraction
+                        (VarReference (29, Identifier "b"))
+                        (FunctionCall (34, Identifier "c") [])
+                    )
+                ]
+            ]
+        ]
+
+source15 :: String
+source15 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    a ++;"
+    , "    b--;"
+    , "}"
+    ]
+
+expect15 :: Result
+expect15 = Right $
+    Program
+        [ Definitions
+            [ FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ VarReassign (17, Identifier "a")
+                    ( Addition
+                        (VarReference (17, Identifier "a"))
+                        (NumReference (20, Number "1"))
+                    )
+                , VarReassign (27, Identifier "b")
+                    ( Subtraction
+                        (VarReference (27, Identifier "b"))
+                        (NumReference (29, Number "1"))
+                    )
+                ]
+            ]
+        ]
+
+source16 :: String
+source16 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    ++a;"
+    , "    -- b;"
+    , "}"
+    ]
+
+expect16 :: Result
+expect16 = Right $
+    Program
+        [ Definitions
+            [ FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ VarReassign (19, Identifier "a")
+                    ( Addition
+                        (VarReference (19, Identifier "a"))
+                        (NumReference (18, Number "1"))
+                    )
+                , VarReassign (29, Identifier "b")
+                    ( Subtraction
+                        (VarReference (29, Identifier "b"))
+                        (NumReference (27, Number "1"))
+                    )
+                ]
+            ]
+        ]
+
+source17 :: String
+source17 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    for (int a = 0; a < 100; a++)"
+    , "    {"
+    , "        bbb();"
+    , "    }"
+    , "}"
+    ]
+
+expect17 :: Result
+expect17 = Right $
+    Program
+        [ Definitions
+            [ FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ For
+                    ( Just
+                        ( VarDefinition
+                            (24, Keyword "int")
+                            (26, Identifier "a")
+                            (Just (NumReference (30, Number "0")))
+                        )
+                    )
+                    ( Just
+                        ( LessThan
+                            (VarReference (33, Identifier "a"))
+                            (NumReference (39, Number "100"))
+                        )
+                    )
+                    ( Just
+                        ( VarReassign
+                            (42, Identifier "a")
+                            ( Addition
+                                (VarReference (42, Identifier "a"))
+                                (NumReference (44, Number "1"))
+                            )
+                        )
+                    )
+                    [ FunctionCallSyntax (63, Identifier "bbb") []
+                    ]
+                ]
+            ]
+        ]
+
+source18 :: String
+source18 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    for (;;)"
+    , "        for (;;)"
+    , "            bbb();"
+    , "    ccc();"
+    , "}"
+    ]
+
+expect18 :: Result
+expect18 = Right $
+    Program
+        [ Definitions
+            [ FunDefinition
+                (3, Keyword "void")
+                (7, Identifier "aaa")
+                []
+                [ For Nothing Nothing Nothing
+                    [ For Nothing Nothing Nothing
+                        [ FunctionCallSyntax (57, Identifier "bbb") []
+                        ]
+                    ]
+                , FunctionCallSyntax (68, Identifier "ccc") []
                 ]
             ]
         ]

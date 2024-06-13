@@ -57,4 +57,9 @@ main = do
         , TestLabel "Braces Reduced While Syntax Analysation"   syntaxAnalyserTest11
         , TestLabel "If-Else Syntax Analysation"                syntaxAnalyserTest12
         , TestLabel "Braces Reduced If-Else Syntax Analysation" syntaxAnalyserTest13
+        , TestLabel "Syntax Sugar += and -= Analysation"        syntaxAnalyserTest14
+        , TestLabel "Syntax Sugar ++ and -- Analysation #1"     syntaxAnalyserTest15
+        , TestLabel "Syntax Sugar ++ and -- Analysation #2"     syntaxAnalyserTest16
+        , TestLabel "For Syntax Analysation"                    syntaxAnalyserTest17
+        , TestLabel "Endless For Syntax Analysation"            syntaxAnalyserTest18
         ]

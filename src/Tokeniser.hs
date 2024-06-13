@@ -36,6 +36,10 @@ data Token = OpenBrace
            | LessOrEq
            | AndAnd
            | BarBar
+           | PlusPlus
+           | MinusMinus
+           | PlusEqual
+           | MinusEqual
            | Symbol Char
            | Keyword String
            | Identifier String
@@ -55,6 +59,10 @@ instance Show Token where
     show LessOrEq         = "'<='"
     show AndAnd           = "'&&'"
     show BarBar           = "'||'"
+    show PlusPlus         = "'++'"
+    show MinusMinus       = "'--'"
+    show PlusEqual        = "'+='"
+    show MinusEqual       = "'-='"
     show (Symbol a)       = "Symbol '" ++ [a] ++ "'"
     show (Keyword a)      = "Keyword '" ++ a ++ "'"
     show (Identifier a)   = "Identifier '" ++ a ++ "'"
@@ -155,6 +163,22 @@ tokenise source = analyse (State [] "" False False False) 0
                                stopBufferingWith2 [(index + 1, BarBar)]
                            _ ->
                                stopBufferingWith [(index, Symbol chara)]
+                   | chara == '+' ->
+                       case source !? (index + 1) of
+                           Just '+' ->
+                               stopBufferingWith2 [(index + 1, PlusPlus)]
+                           Just '=' ->
+                               stopBufferingWith2 [(index + 1, PlusEqual)]
+                           _ ->
+                               stopBufferingWith [(index, Symbol chara)]
+                   | chara == '-' ->
+                       case source !? (index + 1) of
+                           Just '-' ->
+                               stopBufferingWith2 [(index + 1, MinusMinus)]
+                           Just '=' ->
+                               stopBufferingWith2 [(index + 1, MinusEqual)]
+                           _ ->
+                               stopBufferingWith [(index, Symbol chara)]
                    | chara `elem` acceptableSymbols ->
                        stopBufferingWith [(index, Symbol chara)]
                    | chara `elem` (acceptableAlphabets ++ acceptableNumbers) ->
@@ -212,6 +236,22 @@ tokenise source = analyse (State [] "" False False False) 0
                        case source !? (index + 1) of
                            Just '|' ->
                                analyseNextCharWith2 [(index + 1, BarBar)]
+                           _ ->
+                               analyseNextCharWith [(index, Symbol chara)]
+                   | chara == '+' ->
+                       case source !? (index + 1) of
+                           Just '+' ->
+                               analyseNextCharWith2 [(index + 1, PlusPlus)]
+                           Just '=' ->
+                               analyseNextCharWith2 [(index + 1, PlusEqual)]
+                           _ ->
+                               analyseNextCharWith [(index, Symbol chara)]
+                   | chara == '-' ->
+                       case source !? (index + 1) of
+                           Just '-' ->
+                               analyseNextCharWith2 [(index + 1, MinusMinus)]
+                           Just '=' ->
+                               analyseNextCharWith2 [(index + 1, MinusEqual)]
                            _ ->
                                analyseNextCharWith [(index, Symbol chara)]
                    | chara `elem` acceptableSymbols ->
