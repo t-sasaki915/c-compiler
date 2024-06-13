@@ -170,7 +170,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
             (ExpectFunOpenBrace t l args) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False False (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, contents) ->
                                 nextStep' (ExpectFunCloseBrace t l args contents) newIndex
                                 
@@ -238,9 +238,9 @@ data FAnalyseStep = ExpectFirstFactor
                   | ExpectForOpenBraceOrSyntax MSyntax (Maybe Expression) MSyntax
                   | ExpectForCloseBrace MSyntax (Maybe Expression) MSyntax [Syntax]
 
-functionAnalyse :: String -> [(Int, Token)] -> Bool -> Bool -> Int ->
+functionAnalyse :: String -> [(Int, Token)] -> Bool -> Int ->
                    Either SyntaxAnalyserError (Int, [Syntax])
-functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFactor []
+functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
     where
     analyse :: FAnalyseStep -> [Syntax] -> Int ->
                Either SyntaxAnalyserError (Int, [Syntax])
@@ -266,10 +266,10 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                     (_, Keyword "for") ->
                         nextStep ExpectForOpenParentheses
 
-                    (_, Keyword "continue") | insideLoop ->
+                    (_, Keyword "continue") ->
                         nextStep ExpectContinueSemicolon
 
-                    (_, Keyword "break") | insideLoop ->
+                    (_, Keyword "break") ->
                         nextStep ExpectBreakSemicolon
 
                     (_, Keyword k) | k `elem` typeKeywords ->
@@ -470,14 +470,14 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectWhileOpenBraceOrSyntax cond) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False True (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, inner) ->
                                 nextStep' (ExpectWhileCloseBrace cond inner) newIndex
 
                             Left err ->
                                 Left err
                     _ ->
-                        case functionAnalyse source tokens True True index of
+                        case functionAnalyse source tokens True index of
                             Right (newIndex, inner) ->
                                 determine' (While cond inner) (newIndex + 1)
 
@@ -535,7 +535,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectIfOpenBraceOrSyntax cond) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False False (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, inner) ->
                                 nextStep' (ExpectIfCloseBrace cond inner) newIndex
 
@@ -543,7 +543,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                                 Left err
 
                     _ ->
-                        case functionAnalyse source tokens True False index of
+                        case functionAnalyse source tokens True index of
                             Right (newIndex, inner) ->
                                 nextStep' (ExpectElseOrEnd cond inner) (newIndex + 1)
 
@@ -569,7 +569,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectElseOpenBraceOrSyntax cond inner) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False False (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, elseInner) ->
                                 nextStep'
                                     (ExpectElseCloseBrace cond inner elseInner) newIndex
@@ -578,7 +578,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                                 Left err
                     
                     _ ->
-                        case functionAnalyse source tokens True False index of
+                        case functionAnalyse source tokens True index of
                             Right (newIndex, elseInner) ->
                                 determine' (If cond inner elseInner) (newIndex + 1)
 
@@ -672,7 +672,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
             (ExpectForOpenBraceOrSyntax fAssign cond sAssign) ->
                 case token of
                     (_, OpenBrace) ->
-                        case functionAnalyse source tokens False True (index + 1) of
+                        case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, inner) ->
                                 nextStep'
                                     (ExpectForCloseBrace fAssign cond sAssign inner)
@@ -682,7 +682,7 @@ functionAnalyse source tokens justOneSyntax insideLoop = analyse ExpectFirstFact
                                 Left err
 
                     _ ->
-                        case functionAnalyse source tokens True True index of
+                        case functionAnalyse source tokens True index of
                             Right (newIndex, inner) ->
                                 determine'
                                     (For fAssign cond sAssign inner) (newIndex + 1) 
