@@ -20,6 +20,14 @@ module SemanticVerifierSpecDomain
     , expect9
     , source10
     , expect10
+    , source11
+    , expect11
+    , source12
+    , expect12
+    , source13
+    , expect13
+    , source14
+    , expect14
     ) where
 
 import SemanticVerifier
@@ -91,3 +99,27 @@ source10 = "int aaa(int a) { int a; }"
 
 expect10 :: Result
 expect10 = Left $ IdentifierConfliction source10 21 "a"
+
+source11 :: String
+source11 = "void aaa() {}"
+
+expect11 :: Result
+expect11 = Right ()
+
+source12 :: String
+source12 = "void a;"
+
+expect12 :: Result
+expect12 = Left $ InappropriateVarType source12 3 "void"
+
+source13 :: String
+source13 = "void aaa() { void a; }"
+
+expect13 :: Result
+expect13 = Left $ InappropriateVarType source13 16 "void"
+
+source14 :: String
+source14 = "void aaa() { for(;;) { for(;;) { for(;;) { void a; } } } }"
+
+expect14 :: Result
+expect14 = Left $ InappropriateVarType source14 46 "void"

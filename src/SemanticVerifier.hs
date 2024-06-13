@@ -3,6 +3,7 @@ module SemanticVerifier
     , semanticVerify
     , mainDetection
     , conflictionCheck
+    , variableTypeCheck
     ) where
 
 import ErrorHandling
@@ -12,6 +13,7 @@ import Tokeniser (Token(..))
 data SemanticError = NoMainDefined String Int
                    | IdentifierConfliction String Int String
                    | TypeContradiction String Int String String String String
+                   | InappropriateVarType String Int String
                    | BrokenProgramStructure String Int
                    deriving (Show, Eq)
 
@@ -19,16 +21,20 @@ instance TrackableError SemanticError where
     place (NoMainDefined a b)             = (a, b)
     place (IdentifierConfliction a b _)   = (a, b)
     place (TypeContradiction a b _ _ _ _) = (a, b)
+    place (InappropriateVarType a b _)    = (a, b)
     place (BrokenProgramStructure a b)    = (a, b)
     title (NoMainDefined {})              = "No entrypoint was defined"
     title (IdentifierConfliction {})      = "Identifier confliction"
     title (TypeContradiction {})          = "Type contradiction"
+    title (InappropriateVarType {})       = "Inappropriate variable type"
     title (BrokenProgramStructure _ _)    = "Broken program structure"
     cause (NoMainDefined _ _)             = ""
     cause (IdentifierConfliction _ _ a)   =
         "A function or variable whose identifier is " ++ a ++ " is already defined."
     cause (TypeContradiction _ _ a b c d) =
         a ++ " has a type " ++ b ++ ", while the type of " ++ c ++ " is " ++ d ++ "."
+    cause (InappropriateVarType _ _ a)    =
+        a ++ " cannot be a type of variables."
     cause (BrokenProgramStructure _ _)    = ""
 
 (&&&) :: (a -> Bool) -> (a -> Bool) -> a -> Bool
@@ -37,7 +43,8 @@ instance TrackableError SemanticError where
 semanticVerify :: String -> Syntax -> Either SemanticError ()
 semanticVerify =
     mainDetection `andThen`
-    conflictionCheck
+    conflictionCheck `andThen`
+    variableTypeCheck
     where
     andThen f1 f2 a b = f1 a b >>= const (f2 a b)
 
@@ -108,3 +115,21 @@ conflictionCheck source (Program[Definitions defs]) =
                     check defs2 detected (index2 + 1)
 
 conflictionCheck source _ = Left $ BrokenProgramStructure source 0
+
+variableTypeCheck :: String -> Syntax -> Either SemanticError ()
+variableTypeCheck source (Program[Definitions defs]) = checkSequence defs
+    where
+    check :: Syntax -> Either SemanticError ()
+    check (VarDefinition (n, Keyword "void") _ _) =
+        Left $ InappropriateVarType source n "void"
+
+    check (FunDefinition _ _ args body) = checkSequence $ args ++ body
+    check (While _ body)                = checkSequence body
+    check (If _ body1 body2)            = checkSequence $ body1 ++ body2
+    check (For _ _ _ body)              = checkSequence body
+    check _                             = Right ()
+
+    checkSequence :: [Syntax] -> Either SemanticError ()
+    checkSequence xs = mapM check xs >>= const (Right ())
+
+variableTypeCheck source _ = Left $ BrokenProgramStructure source 0

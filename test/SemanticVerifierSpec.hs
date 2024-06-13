@@ -9,6 +9,10 @@ module SemanticVerifierSpec
     , semanticVerifyTest8
     , semanticVerifyTest9
     , semanticVerifyTest10
+    , semanticVerifyTest11
+    , semanticVerifyTest12
+    , semanticVerifyTest13
+    , semanticVerifyTest14
     ) where
 
 import SemanticVerifier
@@ -61,3 +65,15 @@ semanticVerifyTest9 = semanticVerifyTest conflictionCheck source9 expect9
 
 semanticVerifyTest10 :: Test
 semanticVerifyTest10 = semanticVerifyTest conflictionCheck source10 expect10
+
+semanticVerifyTest11 :: Test
+semanticVerifyTest11 = semanticVerifyTest variableTypeCheck source11 expect11
+
+semanticVerifyTest12 :: Test
+semanticVerifyTest12 = semanticVerifyTest variableTypeCheck source12 expect12
+
+semanticVerifyTest13 :: Test
+semanticVerifyTest13 = semanticVerifyTest variableTypeCheck source13 expect13
+
+semanticVerifyTest14 :: Test
+semanticVerifyTest14 = semanticVerifyTest variableTypeCheck source14 expect14

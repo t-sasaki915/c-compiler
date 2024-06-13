@@ -74,4 +74,8 @@ main = do
         , TestLabel "Identifier Confliction Verification #4"      semanticVerifyTest8
         , TestLabel "Identifier Confliction Verification #5"      semanticVerifyTest9
         , TestLabel "Identifier Confliction Verification #6"      semanticVerifyTest10
+        , TestLabel "Variable Type Verification #1"               semanticVerifyTest11
+        , TestLabel "Variable Type Verification #2"               semanticVerifyTest12
+        , TestLabel "Variable Type Verification #3"               semanticVerifyTest13
+        , TestLabel "Variable Type Verification #4"               semanticVerifyTest14
         ]
