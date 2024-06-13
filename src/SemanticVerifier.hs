@@ -1,5 +1,3 @@
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Redundant bracket" #-}
 module SemanticVerifier
     ( SemanticError(..)
     , semanticVerify
@@ -90,7 +88,7 @@ conflictionCheck source (Program[Definitions defs]) =
     functionScope index =
         case defs !! index of
             (FunDefinition _ _ args body) ->
-                (check (args ++ body) [] 0) >>=
+                check (args ++ body) [] 0 >>=
                     const (functionScope (index + 1))
 
             _ ->
