@@ -82,4 +82,13 @@ main = do
         , TestLabel "Loop Feature Verification #2"                semanticVerifyTest16
         , TestLabel "Loop Feature Verification #3"                semanticVerifyTest17
         , TestLabel "Loop Feature Verification #4"                semanticVerifyTest18
+        , TestLabel "Identifier Reference Verification #1"        semanticVerifyTest19
+        , TestLabel "Identifier Reference Verification #2"        semanticVerifyTest20
+        , TestLabel "Identifier Reference Verification #3"        semanticVerifyTest21
+        , TestLabel "Identifier Reference Verification #4"        semanticVerifyTest22
+        , TestLabel "Identifier Reference Verification #5"        semanticVerifyTest23
+        , TestLabel "Identifier Reference Verification #6"        semanticVerifyTest24
+        , TestLabel "Identifier Reference Verification #7"        semanticVerifyTest25
+        , TestLabel "Identifier Reference Verification #8"        semanticVerifyTest26
+        , TestLabel "Identifier Reference Verification #9"        semanticVerifyTest27
         ]

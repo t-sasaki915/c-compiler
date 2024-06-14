@@ -36,6 +36,24 @@ module SemanticVerifierSpecDomain
     , expect17
     , source18
     , expect18
+    , source19
+    , expect19
+    , source20
+    , expect20
+    , source21
+    , expect21
+    , source22
+    , expect22
+    , source23
+    , expect23
+    , source24
+    , expect24
+    , source25
+    , expect25
+    , source26
+    , expect26
+    , source27
+    , expect27
     ) where
 
 import SemanticVerifier
@@ -201,3 +219,78 @@ source18 = unlines
 
 expect18 :: Result
 expect18 = Left $ LoopFeatureOutsideLoop source18 67 "continue"
+
+source19 :: String
+source19 = unlines
+    [ "int aaa(int a, int b)"
+    , "{"
+    , "    int c;"
+    , "    a += b;"
+    , "    return aaa(c, a + b);"
+    , "}"
+    , "int bbb = 0;"
+    , "int ccc()"
+    , "{"
+    , "    int a;"
+    , "    while (aaa(a, a))"
+    , "    {"
+    , "        int b;"
+    , "        for (int i = 0; i < 100; i ++)"
+    , "        {"
+    , "            b = a + i;"
+    , "        }"
+    , "    }"
+    , "    return bbb;"
+    , "}"
+    ]
+
+expect19 :: Result
+expect19 = Right ()
+
+source20 :: String
+source20 = "int a() { return n; }"
+
+expect20 :: Result
+expect20 = Left $ UndefinedIdentifier source20 17 "n"
+
+source21 :: String
+source21 = "int a() { return b(); } int b() { }"
+
+expect21 :: Result
+expect21 = Left $ UndefinedIdentifier source21 17 "b"
+
+source22 :: String
+source22 = "int a() { int n; } int b() { return n; }"
+
+expect22 :: Result
+expect22 = Left $ UndefinedIdentifier source22 36 "n"
+
+source23 :: String
+source23 = "int a() { if (0) { int n; } return n; }"
+
+expect23 :: Result
+expect23 = Left $ UndefinedIdentifier source23 35 "n"
+
+source24 :: String
+source24 = "int a() { for (int i = 0; i < 100; i++) {} return i; }"
+
+expect24 :: Result
+expect24 = Left $ UndefinedIdentifier source24 50 "i"
+
+source25 :: String
+source25 = "int a() { a(1); }"
+
+expect25 :: Result
+expect25 = Left $ UndefinedIdentifier source25 10 "a"
+
+source26 :: String
+source26 = "int a() { a = 1; }"
+
+expect26 :: Result
+expect26 = Left $ UndefinedIdentifier source26 10 "a"
+
+source27 :: String
+source27 = "int a(int b) { b(); }"
+
+expect27 :: Result
+expect27 = Left $ UndefinedIdentifier source27 15 "b"

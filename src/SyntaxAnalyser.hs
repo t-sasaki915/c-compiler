@@ -173,7 +173,7 @@ syntaxAnalyse source tokens = analyse ExpectVarOrFunType [] 0
                         case functionAnalyse source tokens False (index + 1) of
                             Right (newIndex, contents) ->
                                 nextStep' (ExpectFunCloseBrace t l args contents) newIndex
-
+                                
                             Left err ->
                                 Left err
 
@@ -353,7 +353,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     (_, PlusEqual) ->
                         nextStep $ ExpectExpressionToReassignVariablePlusEq l
-
+                    
                     (_, MinusEqual) ->
                         nextStep $ ExpectExpressionToReassignVariableMinusEq l
 
@@ -408,7 +408,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     Left err ->
                         Left $ InvalidExpression err
-
+            
             (ExpectExpressionToReassignVariablePlusEq l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
@@ -497,8 +497,8 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                     (_, Semicolon) ->
                         let keywordIndex = fst $ tokens !! subtract 1 index in
                         determine $ Continue keywordIndex
-
-                    _ ->
+                    
+                    _ -> 
                         unexpectedTokenHalt "';'"
 
             ExpectBreakSemicolon ->
@@ -509,12 +509,12 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                     _ ->
                         unexpectedTokenHalt "';'"
-
+            
             ExpectIfOpenParentheses ->
                 case token of
                     (_, OpenParentheses) ->
                         nextStep ExpectIfCondition
-
+                    
                     _ ->
                         unexpectedTokenHalt "'('"
 
@@ -556,7 +556,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                 case token of
                     (_, CloseBrace) ->
                         nextStep $ ExpectElseOrEnd cond inner
-
+                    
                     _ ->
                         unexpectedTokenHalt "'}'"
 
@@ -578,7 +578,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
 
                             Left err ->
                                 Left err
-
+                    
                     _ ->
                         case functionAnalyse source tokens True index of
                             Right (newIndex, elseInner) ->
@@ -633,7 +633,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                     _ ->
                         case expressionAnalyse source tokens index of
                             Right (newIndex, expr) ->
-                                nextStep'
+                                nextStep' 
                                     (ExpectForSecondSemicolon fAssign (Just expr))
                                         newIndex
 
@@ -687,7 +687,7 @@ functionAnalyse source tokens justOneSyntax = analyse ExpectFirstFactor []
                         case functionAnalyse source tokens True index of
                             Right (newIndex, inner) ->
                                 determine'
-                                    (For fAssign cond sAssign inner) (newIndex + 1)
+                                    (For fAssign cond sAssign inner) (newIndex + 1) 
 
                             Left err ->
                                 Left err
@@ -861,7 +861,7 @@ assignAnalyse source tokens = analyse ExpectKeywordOrIdentifier
 
                     _ ->
                         unexpectedTokenHalt "';' or ')'"
-
+            
             (ExpectReassignEqual l) ->
                 case token of
                     (_, Symbol '=') ->
@@ -902,7 +902,7 @@ assignAnalyse source tokens = analyse ExpectKeywordOrIdentifier
 
                     Left err ->
                         Left $ InvalidExpression err
-
+            
             (ExpectReassignValueToMinusEq l) ->
                 case expressionAnalyse source tokens index of
                     Right (newIndex, expr) ->
@@ -911,7 +911,7 @@ assignAnalyse source tokens = analyse ExpectKeywordOrIdentifier
 
                     Left err ->
                         Left $ InvalidExpression err
-
+            
             (ExpectReassignEnd l v) ->
                 case token of
                     (_, Semicolon) ->
