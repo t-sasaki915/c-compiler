@@ -13,6 +13,10 @@ module SemanticVerifierSpec
     , semanticVerifyTest12
     , semanticVerifyTest13
     , semanticVerifyTest14
+    , semanticVerifyTest15
+    , semanticVerifyTest16
+    , semanticVerifyTest17
+    , semanticVerifyTest18
     ) where
 
 import SemanticVerifier
@@ -77,3 +81,15 @@ semanticVerifyTest13 = semanticVerifyTest variableTypeCheck source13 expect13
 
 semanticVerifyTest14 :: Test
 semanticVerifyTest14 = semanticVerifyTest variableTypeCheck source14 expect14
+
+semanticVerifyTest15 :: Test
+semanticVerifyTest15 = semanticVerifyTest continueAndBreakCheck source15 expect15
+
+semanticVerifyTest16 :: Test
+semanticVerifyTest16 = semanticVerifyTest continueAndBreakCheck source16 expect16
+
+semanticVerifyTest17 :: Test
+semanticVerifyTest17 = semanticVerifyTest continueAndBreakCheck source17 expect17
+
+semanticVerifyTest18 :: Test
+semanticVerifyTest18 = semanticVerifyTest continueAndBreakCheck source18 expect18

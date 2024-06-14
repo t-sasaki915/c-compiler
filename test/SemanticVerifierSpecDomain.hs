@@ -28,6 +28,14 @@ module SemanticVerifierSpecDomain
     , expect13
     , source14
     , expect14
+    , source15
+    , expect15
+    , source16
+    , expect16
+    , source17
+    , expect17
+    , source18
+    , expect18
     ) where
 
 import SemanticVerifier
@@ -123,3 +131,73 @@ source14 = "void aaa() { for(;;) { for(;;) { for(;;) { void a; } } } }"
 
 expect14 :: Result
 expect14 = Left $ InappropriateVarType source14 46 "void"
+
+source15 :: String
+source15 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    for (;;)"
+    , "    {"
+    , "        continue;"
+    , "        break;"
+    , "        for (;;)"
+    , "        {"
+    , "            continue;"
+    , "            break;"
+    , "        }"
+    , "    }"
+    , "    while (1)"
+    , "    {"
+    , "        continue;"
+    , "        break;"
+    , "        if (a)"
+    , "        {"
+    , "            continue;"
+    , "            break;"
+    , "        }"
+    , "    }"
+    , "}"
+    ]
+
+expect15 :: Result
+expect15 = Right ()
+
+source16 :: String
+source16 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    continue;"
+    , "}"
+    ]
+
+expect16 :: Result
+expect16 = Left $ LoopFeatureOutsideLoop source16 24 "continue"
+
+source17 :: String
+source17 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    if (a)"
+    , "    {"
+    , "        continue;"
+    , "    }"
+    , "}"
+    ]
+
+expect17 :: Result
+expect17 = Left $ LoopFeatureOutsideLoop source17 45 "continue"
+
+source18 :: String
+source18 = unlines
+    [ "void aaa()"
+    , "{"
+    , "    for (;;)"
+    , "    {"
+    , "        continue;"
+    , "    }"
+    , "    continue;"
+    , "}"
+    ]
+
+expect18 :: Result
+expect18 = Left $ LoopFeatureOutsideLoop source18 67 "continue"

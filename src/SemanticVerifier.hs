@@ -4,6 +4,7 @@ module SemanticVerifier
     , mainDetection
     , conflictionCheck
     , variableTypeCheck
+    , continueAndBreakCheck
     ) where
 
 import ErrorHandling
@@ -14,6 +15,7 @@ data SemanticError = NoMainDefined String Int
                    | IdentifierConfliction String Int String
                    | TypeContradiction String Int String String String String
                    | InappropriateVarType String Int String
+                   | LoopFeatureOutsideLoop String Int String
                    | BrokenProgramStructure String Int
                    deriving (Show, Eq)
 
@@ -22,11 +24,13 @@ instance TrackableError SemanticError where
     place (IdentifierConfliction a b _)   = (a, b)
     place (TypeContradiction a b _ _ _ _) = (a, b)
     place (InappropriateVarType a b _)    = (a, b)
+    place (LoopFeatureOutsideLoop a b _)  = (a, b)
     place (BrokenProgramStructure a b)    = (a, b)
     title (NoMainDefined {})              = "No entrypoint was defined"
     title (IdentifierConfliction {})      = "Identifier confliction"
     title (TypeContradiction {})          = "Type contradiction"
     title (InappropriateVarType {})       = "Inappropriate variable type"
+    title (LoopFeatureOutsideLoop {})     = "Loop feature outside loop"
     title (BrokenProgramStructure _ _)    = "Broken program structure"
     cause (NoMainDefined _ _)             = ""
     cause (IdentifierConfliction _ _ a)   =
@@ -35,13 +39,16 @@ instance TrackableError SemanticError where
         a ++ " has a type " ++ b ++ ", while the type of " ++ c ++ " is " ++ d ++ "."
     cause (InappropriateVarType _ _ a)    =
         a ++ " cannot be a type of variables."
+    cause (LoopFeatureOutsideLoop _ _ a)  =
+        "A loop feature " ++ a ++ " has used outside a loop syntax."
     cause (BrokenProgramStructure _ _)    = ""
 
 semanticVerify :: String -> Syntax -> Either SemanticError ()
 semanticVerify =
     mainDetection `andThen`
     conflictionCheck `andThen`
-    variableTypeCheck
+    variableTypeCheck `andThen`
+    continueAndBreakCheck
     where
     andThen f1 f2 a b = f1 a b >>= const (f2 a b)
 
@@ -121,3 +128,38 @@ variableTypeCheck source (Program[Definitions defs]) = checkSequence defs
     checkSequence xs = mapM check xs >>= const (Right ())
 
 variableTypeCheck source _ = Left $ BrokenProgramStructure source 0
+
+continueAndBreakCheck :: String -> Syntax -> Either SemanticError ()
+continueAndBreakCheck source (Program[Definitions defs]) = check defs False
+    where
+    check program insideLoop = foldl
+        (\a b ->
+            case a of
+                (Left _) -> a
+                (Right ()) ->
+                    case b of
+                        (Continue n) | not insideLoop ->
+                            Left $ LoopFeatureOutsideLoop source n "continue"
+
+                        (Break n) | not insideLoop ->
+                            Left $ LoopFeatureOutsideLoop source n "break"
+
+                        (FunDefinition _ _ args body) ->
+                            check (args ++ body) insideLoop
+
+                        (While _ body) ->
+                            check body True
+
+                        (If _ body1 body2) ->
+                            check (body1 ++ body2) insideLoop
+
+                        (For _ _ _ body) ->
+                            check body True
+
+                        _ -> a
+
+        )
+        (Right ())
+        program
+
+continueAndBreakCheck source _ = Left $ BrokenProgramStructure source 0

@@ -78,4 +78,8 @@ main = do
         , TestLabel "Variable Type Verification #2"               semanticVerifyTest12
         , TestLabel "Variable Type Verification #3"               semanticVerifyTest13
         , TestLabel "Variable Type Verification #4"               semanticVerifyTest14
+        , TestLabel "Loop Feature Verification #1"                semanticVerifyTest15
+        , TestLabel "Loop Feature Verification #2"                semanticVerifyTest16
+        , TestLabel "Loop Feature Verification #3"                semanticVerifyTest17
+        , TestLabel "Loop Feature Verification #4"                semanticVerifyTest18
         ]
